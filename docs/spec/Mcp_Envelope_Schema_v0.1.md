@@ -49,7 +49,7 @@ The MCP method to invoke. For tool execution, this is always `"tools/call"`.
 - `"tools/call"` - Execute a tool (canonical method for all tool invocations)
 - `"tools/list"` - List available tools
 - `"tools/describe"` - Get tool schema
-- `"server/info"` - Get server information (legacy; prefer `tools/call` with tool `mcp.server.info`)
+- `"server/info"` - Get server information (deprecated alias; routes to `mcp.server.info` via ToolRegistry)
 
 ---
 
@@ -85,12 +85,12 @@ Method-specific parameters.
 }
 ```
 
-**For `server/info`** (legacy method; prefer `tools/call` with tool `mcp.server.info`):
+**For `server/info`** (deprecated alias; routes to `mcp.server.info` via ToolRegistry):
 ```json
 {}
 ```
 
-**Note**: The canonical way to get server information is to use `tools/call` with tool ID `mcp.server.info`:
+**Note**: The `server/info` method is a deprecated alias that internally routes to `mcp.server.info` through the ToolRegistry, ensuring all tool invocations follow the canonical path. The canonical way to get server information is to use `tools/call` with tool ID `mcp.server.info`:
 ```json
 {
   "tool": "mcp.server.info",
@@ -235,14 +235,18 @@ The result of the method execution.
 }
 ```
 
-**For `server/info`** (legacy method; prefer `tools/call` with tool `mcp.server.info`):
+**For `server/info`** (deprecated alias; routes to `mcp.server.info` via ToolRegistry):
 ```json
 {
-  "serverVersion": "string",
-  "unityVersion": "string",
-  "platform": "string",
-  "enabledToolCategories": ["string"],
-  "tier": "string"
+  "tool": "mcp.server.info",
+  "output": {
+    "serverVersion": "string",
+    "unityVersion": "string",
+    "platform": "string",
+    "enabledToolCategories": ["string"],
+    "tier": "string"
+  },
+  "diagnostics": ["string"] (optional, may include deprecation notice)
 }
 ```
 

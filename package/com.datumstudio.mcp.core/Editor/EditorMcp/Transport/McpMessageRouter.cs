@@ -11,7 +11,7 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
     /// Routes MCP request envelopes to ToolRegistry methods and converts responses
     /// to MCP response envelopes. Handles all MCP protocol methods: tools/call
     /// (canonical method for tool invocations), tools/list, tools/describe, and
-    /// server/info (legacy method; prefer tools/call with tool mcp.server.info).
+    /// server/info (deprecated alias that routes to mcp.server.info via ToolRegistry).
     /// </summary>
     public class McpMessageRouter
     {
@@ -364,47 +364,146 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
             };
         }
 
+        /// <summary>
+        /// Handles the legacy "server/info" method by routing to mcp.server.info via ToolRegistry.
+        /// This is a deprecated alias that maintains backward compatibility while ensuring
+        /// all tool invocations go through the canonical ToolRegistry path.
+        /// </summary>
         private McpResponse HandleServerInfo(McpRequest request)
         {
-            // Execute on main thread - Application and ToolRegistry use Unity APIs
-            var serverInfoResponse = EditorMcpMainThreadDispatcher.Instance.Invoke(() =>
+            // Route to mcp.server.info tool via ToolRegistry (same path as tools/call)
+            const string toolId = "mcp.server.info";
+            var invokeRequest = new ToolInvokeRequest
             {
-                var categories = _toolRegistry.List()
-                    .Select(t => t.Category)
-                    .Distinct()
-                    .OrderBy(c => c)
-                    .ToArray();
+                Tool = toolId,
+                Arguments = new Dictionary<string, object>() // mcp.server.info takes no arguments
+            };
 
-                // Return as ToolInvokeResponse with data in Output
-                return new ToolInvokeResponse
+            // Invoke tool via registry through main thread dispatcher
+            // This ensures all Unity API calls execute on the main thread
+            ToolInvocationResult result;
+            
+            // Wrap the registry invocation in a dispatcher call
+            var dispatcherResponse = EditorMcpMainThreadDispatcher.Instance.Invoke(() =>
+            {
+                // This executes on the main thread - safe to call Unity APIs
+                var registryResult = _toolRegistry.Invoke(toolId, invokeRequest);
+                
+                // Convert ToolInvocationResult to ToolInvokeResponse for dispatcher
+                if (registryResult.IsSuccess)
                 {
-                    Tool = "server.info",
-                    Output = new Dictionary<string, object>
+                    // Add deprecation diagnostic to the response
+                    var response = registryResult.Response;
+                    var diagnostics = new List<string>(response.Diagnostics ?? new string[0]);
+                    diagnostics.Add("The 'server/info' method is deprecated. Use 'tools/call' with tool 'mcp.server.info' instead.");
+                    
+                    return new ToolInvokeResponse
                     {
-                        { "serverVersion", _serverVersion },
-                        { "unityVersion", Application.unityVersion },
-                        { "platform", Application.platform.ToString() },
-                        { "enabledToolCategories", categories },
-                        { "tier", "core" }
-                    }
-                };
-            }, TimeSpan.FromSeconds(10));
+                        Tool = response.Tool,
+                        Output = response.Output,
+                        Diagnostics = diagnostics.ToArray()
+                    };
+                }
+                else
+                {
+                    // Convert error to ToolInvokeResponse format
+                    return new ToolInvokeResponse
+                    {
+                        Tool = toolId,
+                        Output = new Dictionary<string, object>
+                        {
+                            { "error", registryResult.Error.Message },
+                            { "code", registryResult.Error.Code },
+                            { "errorType", registryResult.Error.Data?.ErrorType ?? "execution" },
+                            { "details", registryResult.Error.Data?.Details ?? new Dictionary<string, object>() }
+                        },
+                        Diagnostics = new[] { $"Tool invocation failed: {registryResult.Error.Message}" }
+                    };
+                }
+            }, TimeSpan.FromSeconds(30));
 
-            // Check for dispatcher error
-            if (serverInfoResponse.Tool.StartsWith("internal."))
+            // Check if dispatcher returned a timeout/error response
+            if (dispatcherResponse.Tool.StartsWith("internal."))
             {
-                return CreateErrorResponse(request.Id, EditorMcpErrorCodes.ToolExecutionError,
-                    serverInfoResponse.Output.ContainsKey("error") 
-                        ? serverInfoResponse.Output["error"].ToString() 
-                        : "Failed to get server info", null);
+                // Dispatcher returned an error (timeout or exception)
+                result = ToolInvocationResult.Failure(new EditorMcpError
+                {
+                    Code = dispatcherResponse.Tool == "internal.timeout" 
+                        ? EditorMcpErrorCodes.ToolExecutionTimeout 
+                        : EditorMcpErrorCodes.ToolExecutionError,
+                    Message = dispatcherResponse.Output.ContainsKey("error") 
+                        ? dispatcherResponse.Output["error"].ToString() 
+                        : "Tool execution failed",
+                    Data = new EditorMcpErrorData
+                    {
+                        Tool = toolId,
+                        ErrorType = dispatcherResponse.Tool == "internal.timeout" 
+                            ? ErrorTypes.Timeout 
+                            : ErrorTypes.Execution,
+                        Details = dispatcherResponse.Output
+                    }
+                });
+            }
+            else if (dispatcherResponse.Output.ContainsKey("error"))
+            {
+                // Registry returned an error (converted to ToolInvokeResponse)
+                result = ToolInvocationResult.Failure(new EditorMcpError
+                {
+                    Code = dispatcherResponse.Output.ContainsKey("code") 
+                        ? Convert.ToInt32(dispatcherResponse.Output["code"]) 
+                        : EditorMcpErrorCodes.ToolExecutionError,
+                    Message = dispatcherResponse.Output["error"].ToString(),
+                    Data = new EditorMcpErrorData
+                    {
+                        Tool = toolId,
+                        ErrorType = dispatcherResponse.Output.ContainsKey("errorType")
+                            ? dispatcherResponse.Output["errorType"].ToString()
+                            : ErrorTypes.Execution,
+                        Details = dispatcherResponse.Output.ContainsKey("details")
+                            ? dispatcherResponse.Output["details"] as Dictionary<string, object>
+                            : new Dictionary<string, object>()
+                    }
+                });
+            }
+            else
+            {
+                // Success - use the response directly
+                result = ToolInvocationResult.Success(dispatcherResponse);
             }
 
-            return new McpResponse
+            if (result.IsSuccess)
             {
-                JsonRpc = "2.0",
-                Id = request.Id,
-                Result = serverInfoResponse.Output
-            };
+                // Convert ToolInvokeResponse to MCP response (canonical tools/call shape)
+                var response = new McpResponse
+                {
+                    JsonRpc = "2.0",
+                    Id = request.Id,
+                    Result = new Dictionary<string, object>
+                    {
+                        { "tool", result.Response.Tool },
+                        { "output", result.Response.Output }
+                    }
+                };
+
+                // Add diagnostics if present
+                if (result.Response.Diagnostics != null && result.Response.Diagnostics.Length > 0)
+                {
+                    response.Result["diagnostics"] = result.Response.Diagnostics;
+                }
+
+                return response;
+            }
+            else
+            {
+                // Convert EditorMcpError to MCP error response
+                return CreateErrorResponse(request.Id, result.Error.Code, result.Error.Message,
+                    new Dictionary<string, object>
+                    {
+                        { "tool", result.Error.Data?.Tool },
+                        { "errorType", result.Error.Data?.ErrorType },
+                        { "details", result.Error.Data?.Details ?? new Dictionary<string, object>() }
+                    });
+            }
         }
 
         private McpResponse CreateErrorResponse(object id, int code, string message, Dictionary<string, object> data)
