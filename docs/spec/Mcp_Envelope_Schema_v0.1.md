@@ -46,10 +46,10 @@ Request identifier. Used to correlate requests with responses. Must be unique wi
 The MCP method to invoke. For tool execution, this is always `"tools/call"`.
 
 **Valid Methods**:
-- `"tools/call"` - Execute a tool
+- `"tools/call"` - Execute a tool (canonical method for all tool invocations)
 - `"tools/list"` - List available tools
 - `"tools/describe"` - Get tool schema
-- `"server/info"` - Get server information
+- `"server/info"` - Get server information (legacy; prefer `tools/call` with tool `mcp.server.info`)
 
 ---
 
@@ -85,9 +85,17 @@ Method-specific parameters.
 }
 ```
 
-**For `server/info`**:
+**For `server/info`** (legacy method; prefer `tools/call` with tool `mcp.server.info`):
 ```json
 {}
+```
+
+**Note**: The canonical way to get server information is to use `tools/call` with tool ID `mcp.server.info`:
+```json
+{
+  "tool": "mcp.server.info",
+  "arguments": {}
+}
 ```
 
 ---
@@ -129,6 +137,19 @@ Method-specific parameters.
   "method": "tools/describe",
   "params": {
     "tool": "project.info"
+  }
+}
+```
+
+**Server Info (Canonical - via tools/call)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "req-004",
+  "method": "tools/call",
+  "params": {
+    "tool": "mcp.server.info",
+    "arguments": {}
   }
 }
 ```
@@ -214,7 +235,7 @@ The result of the method execution.
 }
 ```
 
-**For `server/info`**:
+**For `server/info`** (legacy method; prefer `tools/call` with tool `mcp.server.info`):
 ```json
 {
   "serverVersion": "string",
@@ -222,6 +243,20 @@ The result of the method execution.
   "platform": "string",
   "enabledToolCategories": ["string"],
   "tier": "string"
+}
+```
+
+**For `tools/call` with tool `mcp.server.info`** (canonical):
+```json
+{
+  "tool": "mcp.server.info",
+  "output": {
+    "serverVersion": "string",
+    "unityVersion": "string",
+    "platform": "string",
+    "enabledToolCategories": ["string"],
+    "tier": "string"
+  }
 }
 ```
 

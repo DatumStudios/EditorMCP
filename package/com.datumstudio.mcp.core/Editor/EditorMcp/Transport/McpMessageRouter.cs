@@ -9,8 +9,9 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
 {
     /// <summary>
     /// Routes MCP request envelopes to ToolRegistry methods and converts responses
-    /// to MCP response envelopes. Handles all MCP protocol methods: tools/call,
-    /// tools/list, tools/describe, and server/info.
+    /// to MCP response envelopes. Handles all MCP protocol methods: tools/call
+    /// (canonical method for tool invocations), tools/list, tools/describe, and
+    /// server/info (legacy method; prefer tools/call with tool mcp.server.info).
     /// </summary>
     public class McpMessageRouter
     {

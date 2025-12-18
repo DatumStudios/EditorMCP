@@ -41,8 +41,8 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
                 // Start transport
                 transport.Start();
 
-                // Send mcp.server.info request
-                var requestJson = "{\"jsonrpc\":\"2.0\",\"id\":\"test-001\",\"method\":\"server/info\",\"params\":{}}\n";
+                // Send mcp.server.info request using tools/call method (canonical format)
+                var requestJson = "{\"jsonrpc\":\"2.0\",\"id\":\"test-001\",\"method\":\"tools/call\",\"params\":{\"tool\":\"mcp.server.info\",\"arguments\":{}}}\n";
                 var requestBytes = Encoding.UTF8.GetBytes(requestJson);
                 inputStream.Write(requestBytes, 0, requestBytes.Length);
                 inputStream.Position = 0; // Reset for reading
@@ -86,7 +86,8 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
         }
 
         /// <summary>
-        /// Validates the response JSON contains required fields: serverVersion, unityVersion, and transportStatus indicators.
+        /// Validates the response JSON contains required fields per mcp.server.info tool output schema:
+        /// serverVersion, unityVersion, platform, enabledToolCategories, and tier.
         /// </summary>
         private static bool ValidateResponse(string responseJson)
         {
@@ -95,19 +96,29 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
 
             try
             {
-                // Simple validation - check for required fields in response JSON
+                // Validate JSON-RPC envelope structure
                 var hasJsonRpc = responseJson.Contains("\"jsonrpc\"");
                 var hasId = responseJson.Contains("\"id\"");
                 var hasResult = responseJson.Contains("\"result\"");
-                var hasServerVersion = responseJson.Contains("\"serverVersion\"") || responseJson.Contains("serverVersion");
-                var hasUnityVersion = responseJson.Contains("\"unityVersion\"") || responseJson.Contains("unityVersion");
-                
-                // transportStatus can be indicated by enabledToolCategories, tier, or platform
-                var hasTransportStatus = responseJson.Contains("\"enabledToolCategories\"") ||
-                                        responseJson.Contains("\"tier\"") ||
-                                        responseJson.Contains("\"platform\"");
 
-                return hasJsonRpc && hasId && hasResult && hasServerVersion && hasUnityVersion && hasTransportStatus;
+                if (!hasJsonRpc || !hasId || !hasResult)
+                    return false;
+
+                // Validate result contains tool output structure
+                var hasTool = responseJson.Contains("\"tool\"") && responseJson.Contains("mcp.server.info");
+                var hasOutput = responseJson.Contains("\"output\"");
+
+                if (!hasTool || !hasOutput)
+                    return false;
+
+                // Validate mcp.server.info tool output schema fields (per Core_Tools_v0.1.md)
+                var hasServerVersion = responseJson.Contains("\"serverVersion\"");
+                var hasUnityVersion = responseJson.Contains("\"unityVersion\"");
+                var hasPlatform = responseJson.Contains("\"platform\"");
+                var hasEnabledToolCategories = responseJson.Contains("\"enabledToolCategories\"");
+                var hasTier = responseJson.Contains("\"tier\"");
+
+                return hasServerVersion && hasUnityVersion && hasPlatform && hasEnabledToolCategories && hasTier;
             }
             catch
             {

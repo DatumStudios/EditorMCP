@@ -22,7 +22,7 @@ namespace DatumStudio.Mcp.Core.Editor.Transport
         public string id;
 
         /// <summary>
-        /// MCP method name (e.g., "tools/call", "tools/list", "tools/describe", "server/info").
+        /// MCP method name (e.g., "tools/call" - canonical for tool invocations, "tools/list", "tools/describe", "server/info" - legacy).
         /// </summary>
         public string method;
 
