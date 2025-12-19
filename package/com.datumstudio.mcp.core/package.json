@@ -1,6 +1,6 @@
 {
   "name": "com.datumstudio.mcp.core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "DatumStudio MCP Core",
   "description": "Editor-first deterministic tooling foundation",
   "unity": "2021.3",
