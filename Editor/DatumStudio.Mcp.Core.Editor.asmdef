@@ -1,9 +1,7 @@
 {
     "name": "DatumStudio.Mcp.Core.Editor",
     "rootNamespace": "DatumStudio.Mcp.Core.Editor",
-    "references": [
-        "DatumStudio.Mcp.Core.Runtime"
-    ],
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
