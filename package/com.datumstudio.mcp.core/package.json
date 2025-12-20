@@ -19,6 +19,11 @@
     "url": "https://github.com/DatumStudios"
   },
   "dependencies": {},
+  "files": [
+    "Editor/**",
+    "package.json",
+    "package.json.meta"
+  ],
   "samples": [
     {
       "displayName": "Minimal Demo",
