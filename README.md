@@ -13,14 +13,14 @@ DatumStudio MCP Core provides a minimal, opinionated foundation for building Uni
 1. Open Unity Package Manager (Window > Package Manager)
 2. Click the `+` button
 3. Select "Add package from git URL"
-4. Enter: `https://github.com/DatumStudios/datumstudio-mcp-core.git?path=package/com.datumstudio.mcp.core`
+4. Enter: `https://github.com/DatumStudios/datumstudio-mcp-core.git#main`
 
 Alternatively, add to your `Packages/manifest.json`:
 
 ```json
 {
   "dependencies": {
-    "com.datumstudio.mcp.core": "https://github.com/DatumStudios/datumstudio-mcp-core.git?path=package/com.datumstudio.mcp.core"
+    "com.datumstudio.mcp.core": "https://github.com/DatumStudios/datumstudio-mcp-core.git#main"
   }
 }
 ```
