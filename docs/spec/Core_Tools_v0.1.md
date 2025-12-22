@@ -1,12 +1,13 @@
 # EditorMCP Core Tools v0.1
 
-This document defines the canonical list of 15 read-only tools for EditorMCP Core v0.1. All tools in this version are **read-only** and designed for safe inspection and analysis of Unity projects.
+This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Most tools are **read-only** and designed for safe inspection and analysis of Unity projects. A small number of safe single-object write operations are included for basic hierarchy management.
 
 ## Tool Categories
 
 - **MCP Platform Tools** (3): Core MCP protocol and server information
 - **Project & Environment** (4): Project-wide inspection and validation
 - **Scene & Hierarchy** (3): Scene structure and component inspection
+- **GameObject Operations** (3): GameObject discovery and safe hierarchy management
 - **Asset Inspection** (2): Asset metadata and dependency analysis
 - **Audio** (2): AudioMixer inspection (example domain)
 - **Editor State** (1): Current editor selection context
@@ -304,6 +305,123 @@ This document defines the canonical list of 15 read-only tools for EditorMCP Cor
 
 ---
 
+## GameObject Operations Tools
+
+### go.find
+
+**Purpose**: Finds GameObjects in the active scene matching specified criteria (hierarchy path pattern, component type, tag, layer). Essential discovery tool that enables 90% of Cursor queries starting with "find objects". Works on the currently active scene without requiring scene path specification.
+
+**Inputs**:
+- `hierarchyPath` (optional, string): Hierarchy path pattern with wildcards (e.g., "Root/Enemies/*", "Root/**/Enemy")
+- `componentType` (optional, string): Filter by component type name (e.g., "UnityEngine.BoxCollider")
+- `tag` (optional, string): Filter by tag name (e.g., "Enemy")
+- `layer` (optional, integer): Filter by layer index
+- `namePattern` (optional, string): Filter by GameObject name pattern (supports wildcards)
+
+**Outputs**:
+```json
+{
+  "matches": [
+    {
+      "instanceId": 12345,
+      "name": "Goblin",
+      "hierarchyPath": "Root/Enemies/Goblin",
+      "components": ["UnityEngine.Transform", "UnityEngine.BoxCollider"],
+      "tag": "Enemy",
+      "layer": 8
+    }
+  ],
+  "activeScene": "Assets/Scenes/Main.unity"
+}
+```
+
+**Validation Rules**:
+- Requires an active scene to be loaded
+- Hierarchy path patterns support `*` (single level) and `**` (recursive) wildcards
+- All filters are optional; multiple filters combine with AND logic
+
+**Error Handling**:
+- No active scene: `success = false`, `error = "No active scene loaded"`
+- Invalid hierarchy path pattern: `success = false`, `error = "Invalid hierarchy path pattern"`
+
+**Safety Note**: Read-only discovery operation. Searches active scene hierarchy only; no objects are selected, modified, or created. Universal debugging/inspection tool used daily by all developers.
+
+---
+
+### go.setParent
+
+**Purpose**: Changes the parent of a GameObject in the active scene. Enables basic hierarchy management for single-object operations. Essential for "reparent this" workflows that indies use constantly.
+
+**Inputs**:
+- `childPath` (required, string): Hierarchy path to the GameObject to reparent (e.g., "Root/Enemies/Goblin")
+- `parentPath` (optional, string): Hierarchy path to the new parent GameObject (e.g., "Root/Enemies/Container"). If omitted or empty string, reparents to scene root.
+
+**Outputs**:
+```json
+{
+  "success": true,
+  "childPath": "Root/Enemies/Goblin",
+  "newParentPath": "Root/Enemies/Container",
+  "newHierarchyPath": "Root/Enemies/Container/Goblin"
+}
+```
+
+**Validation Rules**:
+- Child GameObject must exist in active scene
+- Parent GameObject must exist in active scene (if specified)
+- Cannot set parent to a descendant of the child (prevents circular hierarchy)
+- Requires an active scene to be loaded
+
+**Error Handling**:
+- No active scene: `success = false`, `error = "No active scene loaded"`
+- Child not found: `success = false`, `error = "Child GameObject not found"`
+- Parent not found: `success = false`, `error = "Parent GameObject not found"`
+- Circular hierarchy: `success = false`, `error = "Cannot set parent to descendant"`
+
+**Safety Note**: Single-object hierarchy modification. Uses `Undo.RecordObject()` and `Undo.SetTransformParent()` for undo support. Low-risk operation that indies need constantly for basic hierarchy management. Not a batch operation.
+
+---
+
+### component.list
+
+**Purpose**: Returns all components attached to a GameObject in the active scene, including component types and property counts. Perfect complement to `go.find` for "What components on this?" queries. Works on the currently active scene without requiring scene path specification.
+
+**Inputs**:
+- `hierarchyPath` (required, string): Hierarchy path to the GameObject (e.g., "Root/Enemies/Goblin")
+- `includeProperties` (optional, boolean): Include serialized field names and types (default: false)
+
+**Outputs**:
+```json
+{
+  "hierarchyPath": "Root/Enemies/Goblin",
+  "components": [
+    {
+      "type": "UnityEngine.BoxCollider",
+      "instanceId": 67890,
+      "propertyCount": 5
+    },
+    {
+      "type": "UnityEngine.Rigidbody",
+      "instanceId": 67891,
+      "propertyCount": 12
+    }
+  ],
+  "activeScene": "Assets/Scenes/Main.unity"
+}
+```
+
+**Validation Rules**:
+- Requires an active scene to be loaded
+- GameObject must exist in active scene
+
+**Error Handling**:
+- No active scene: `success = false`, `error = "No active scene loaded"`
+- GameObject not found: `success = false`, `error = "GameObject not found"`
+
+**Safety Note**: Read-only component inspection. Reads component data from active scene only; no components or properties are modified. Universal debugging tool that complements `go.find` for discovery workflows.
+
+---
+
 ## Asset Inspection Tools
 
 ### asset.info
@@ -467,13 +585,19 @@ This document defines the canonical list of 15 read-only tools for EditorMCP Cor
 
 ## Notes
 
-All tools in v0.1 are **read-only**. This ensures:
+Most tools in v0.1 are **read-only** to ensure:
 - Zero risk of accidental project modification
 - Safe exploration and inspection workflows
 - Clear upgrade path to write-capable tools in future versions
 - Trust-building through demonstrated safety
 
-Future versions may introduce write-capable tools with appropriate safety guardrails and tier restrictions.
+**Exception: `go.setParent`** is included as a safe single-object write operation because:
+- It's a universal need for basic hierarchy management
+- It's undo-safe and low-risk (single object, no batch)
+- It enables "try before buy" evaluation of write capabilities
+- It matches the Core philosophy of "discovery + basic fixes"
+
+Future versions may introduce additional write-capable tools with appropriate safety guardrails and tier restrictions.
 
 ## Performance Bounds and Best-Effort Behavior
 
@@ -502,4 +626,65 @@ Some tools operate with "best-effort" limitations due to Unity API constraints:
 - **`audio.mixer.snapshot.read`**: Parameter reading uses reflection-based workarounds due to Unity API limitations; some parameters may not be accessible
 
 These limitations are documented in tool-specific notes and communicated via the `diagnostics` field when applicable.
+
+---
+
+## Version Compatibility
+
+### Version Strategy Summary
+
+- **Minimum Unity Version**: Unity 2022.3 LTS (Asset Store requirement)
+- **Target Versions**: Unity 2022.3 LTS + Unity 6.0 LTS
+- **Compatibility Status**: All 18 Core tools fully compatible 2022.3 LTS → Unity 6.0 LTS with zero conditional compilation needed
+
+### Core Tools Compatibility Matrix (18 Tools)
+
+| Tool | Unity 2022.3 LTS | Unity 6.0 LTS | Version Notes |
+|------|------------------|---------------|---------------|
+| **MCP Platform Tools** |
+| `mcp.server.info` | ✅ Full | ✅ Full | `Application.unityVersion` stable |
+| `mcp.tools.list` | ✅ Full | ✅ Full | ToolRegistry discovery unchanged |
+| `mcp.tool.describe` | ✅ Full | ✅ Full | Schema generation unchanged |
+| **Project & Environment** |
+| `project.info` | ✅ Full | ✅ Full | `AssetDatabase` APIs stable |
+| `project.scenes.list` | ✅ Full | ✅ Full | `EditorBuildSettings` stable |
+| `project.assets.summary` | ✅ Full | ✅ Full | `AssetDatabase.FindAssets()` stable |
+| `project.references.missing` | ✅ Full | ✅ Full | GUID system stable |
+| **Scene & Hierarchy** |
+| `scene.hierarchy.dump` | ✅ Full | ✅ Full | `GameObject` hierarchy APIs unchanged |
+| `scene.objects.find` | ✅ Full | ✅ Full | `GameObject.Find()` stable |
+| `scene.components.list` | ✅ Full | ✅ Full | `Component` APIs unchanged |
+| **GameObject Operations** |
+| `go.find` | ✅ Full | ✅ Full | `GameObject.Find()` stable |
+| `go.setParent` | ✅ Full | ✅ Full | `Transform.SetParent()` unchanged |
+| `component.list` | ✅ Full | ✅ Full | `GetComponents()` unchanged |
+| **Asset Inspection** |
+| `asset.info` | ✅ Full | ✅ Full | `AssetDatabase` APIs stable |
+| `asset.dependencies.graph` | ✅ Full | ✅ Full | `AssetDatabase.GetDependencies()` stable |
+| **Audio** |
+| `audio.mixer.list` | ✅ Full | ✅ Full | `AssetDatabase.FindAssets()` stable |
+| `audio.mixer.snapshot.read` | ✅ Full | ✅ Full | AudioMixer APIs unchanged |
+| **Editor State** |
+| `editor.selection.info` | ✅ Full | ✅ Full | `Selection` APIs unchanged |
+
+**Legend:**
+- ✅ Full = Complete feature parity, no version differences
+
+### Version Notes
+
+**Status**: All 18 Core tools have zero conditional compilation needed. All Unity APIs used by Core tools are stable since Unity 2017+ and unchanged across 2022.3 → Unity 6.0.
+
+**Core Infrastructure Compatibility:**
+- `ToolRegistry`: Attribute-driven discovery works identically on 2022.3 and Unity 6.0
+- `AssetDatabase`: All Core tool APIs stable since Unity 2017.1
+- `GameObject`/`Component`: No API changes affecting Core tools
+- `Selection`: Editor selection APIs unchanged
+
+**Package Requirements:**
+- **None** - All Core tools use only built-in Unity APIs
+- No package dependencies required for Core tier
+
+**Testing Recommendations:**
+- Unity 2022.3.20f1 LTS (minimum version)
+- Unity 6000.0.0f1 LTS (latest Unity 6)
 
