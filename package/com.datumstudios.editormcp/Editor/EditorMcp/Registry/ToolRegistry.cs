@@ -65,9 +65,10 @@ namespace DatumStudios.EditorMCP.Registry
                 return;
             }
 
-            // Trigger discovery via instance method
-            var instance = Instance;
-            instance.DiscoverAttributeTools();
+            // Create a temporary instance to perform discovery
+            // The actual instance will be created by EditorMcpServer later
+            var tempInstance = new ToolRegistry();
+            tempInstance.DiscoverAttributeTools();
             _attributeDiscoveryPerformed = true;
         }
 
