@@ -3,34 +3,23 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: editor.selection.info - Returns information about currently selected objects and assets in the Unity Editor.
     /// </summary>
-    public class EditorSelectionInfoTool : IEditorMcpTool
+    [McpToolCategory("editor")]
+    public static class EditorSelectionInfoTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns information about currently selected objects and assets in the Unity Editor. Bridges human and AI workflows by providing current editor context.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the EditorSelectionInfoTool class.
-        /// </summary>
-        public EditorSelectionInfoTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to return selection information.
-        /// </summary>
-        /// <param name="request">The tool invocation request (no arguments required).</param>
-        /// <returns>Selection information response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters (no parameters required).</param>
+        /// <returns>JSON string with selection information.</returns>
+        [McpTool("editor.selection.info", "Returns information about currently selected objects and assets in the Unity Editor. Bridges human and AI workflows by providing current editor context.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             var selectedObjects = new List<Dictionary<string, object>>();
             var selectedGameObjects = Selection.gameObjects;
@@ -145,16 +134,10 @@ namespace DatumStudios.EditorMCP.Tools
                 output["activeGameObject"] = activeGameObject;
             }
 
-            var response = new ToolInvokeResponse
-            {
-                Tool = Definition.Id,
-                Output = output
-            };
-
-            return response;
+            return UnityEngine.JsonUtility.ToJson(output);
         }
 
-        private string GetHierarchyPath(GameObject obj)
+        private static string GetHierarchyPath(GameObject obj)
         {
             if (obj == null)
                 return "";
@@ -167,96 +150,6 @@ namespace DatumStudios.EditorMCP.Tools
                 parent = parent.parent;
             }
             return path;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "editor.selection.info",
-                Name = "Editor Selection Info",
-                Description = "Returns information about currently selected objects and assets in the Unity Editor. Bridges human and AI workflows by providing current editor context.",
-                Category = "editor",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>(),
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "selectedObjects",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of selected objects and assets",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "name",
-                                        new ToolOutputSchema { Type = "string", Description = "Object name" }
-                                    },
-                                    {
-                                        "type",
-                                        new ToolOutputSchema { Type = "string", Description = "Object type (e.g., 'GameObject', 'Material', 'Texture2D')" }
-                                    },
-                                    {
-                                        "instanceId",
-                                        new ToolOutputSchema { Type = "integer", Description = "Unity instance ID" }
-                                    },
-                                    {
-                                        "path",
-                                        new ToolOutputSchema { Type = "string", Description = "Hierarchy path (for GameObjects) or asset path (for assets)" }
-                                    },
-                                    {
-                                        "components",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "Component type names (for GameObjects only)",
-                                            Items = new ToolOutputSchema { Type = "string" }
-                                        }
-                                    },
-                                    {
-                                        "guid",
-                                        new ToolOutputSchema { Type = "string", Description = "Asset GUID (for assets only)" }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "activeScene",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Path to the currently active scene"
-                        }
-                    },
-                    {
-                        "activeGameObject",
-                        new ToolOutputSchema
-                        {
-                            Type = "object",
-                            Description = "Currently active GameObject (if any)",
-                            Properties = new Dictionary<string, ToolOutputSchema>
-                            {
-                                {
-                                    "name",
-                                    new ToolOutputSchema { Type = "string", Description = "GameObject name" }
-                                },
-                                {
-                                    "path",
-                                    new ToolOutputSchema { Type = "string", Description = "Hierarchy path" }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads current editor selection state only; selection is not modified."
-            };
         }
     }
 }

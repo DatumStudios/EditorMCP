@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using UnityEditor;
 using DatumStudios.EditorMCP.Registry;
 using DatumStudios.EditorMCP.Schemas;
 using DatumStudios.EditorMCP.Tools;
 using DatumStudios.EditorMCP.Transport;
+using DatumStudios.EditorMCP.Diagnostics;
 
 namespace DatumStudios.EditorMCP.Server
 {
@@ -46,13 +48,14 @@ namespace DatumStudios.EditorMCP.Server
         public EditorMcpServer()
         {
             _toolRegistry = new ToolRegistry();
+            ToolRegistry.Current = _toolRegistry; // Set static accessor for static tools
             _isRunning = false;
         }
 
         /// <summary>
         /// Starts the MCP server. Initializes the tool registry and starts the stdio transport.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when server is already running.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when server is already running or Unity version is incompatible.</exception>
         public void Start()
         {
             if (_isRunning)
@@ -60,7 +63,21 @@ namespace DatumStudios.EditorMCP.Server
                 throw new InvalidOperationException("Server is already running.");
             }
 
-            // Register core tools first
+            // Check Unity version compatibility - block startup if incompatible
+            if (!VersionValidator.IsCompatible())
+            {
+                var errorMessage = $"[EditorMCP] Server cannot start: Requires Unity {VersionValidator.GetMinimumVersion()}+. " +
+                    $"Current version: {Application.unityVersion}. " +
+                    $"Please upgrade to Unity 2022.3 LTS or later.";
+                
+                Debug.LogError(errorMessage);
+                throw new InvalidOperationException(errorMessage);
+            }
+
+            // Discover attribute-based tools first (automatic discovery)
+            _toolRegistry.DiscoverAttributeTools();
+
+            // Register legacy interface-based core tools (for backward compatibility during migration)
             RegisterCoreTools();
 
             // Create and start transport host

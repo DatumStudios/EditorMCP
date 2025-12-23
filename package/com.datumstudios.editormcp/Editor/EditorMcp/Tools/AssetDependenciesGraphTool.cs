@@ -2,81 +2,71 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: asset.dependencies.graph - Returns the dependency graph for an asset.
     /// </summary>
-    public class AssetDependenciesGraphTool : IEditorMcpTool
+    [McpToolCategory("asset")]
+    public static class AssetDependenciesGraphTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns the dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the AssetDependenciesGraphTool class.
-        /// </summary>
-        public AssetDependenciesGraphTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to return dependency graph.
-        /// </summary>
-        /// <param name="request">The tool invocation request with assetPath or guid and optional depth.</param>
-        /// <returns>Dependency graph response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with "assetPath" or "guid" string, optional "depth" integer (1-10), and optional "direction" string ("dependencies", "dependents", "both").</param>
+        /// <returns>JSON string with dependency graph.</returns>
+        [McpTool("asset.dependencies.graph", "Returns the dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string assetPath = null;
             string guid = null;
             int depth = 1;
             string direction = "both";
 
-            if (request.Arguments != null)
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("assetPath", out var assetPathObj) && assetPathObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    assetPath = (string)assetPathObj;
-                }
-
-                if (request.Arguments.TryGetValue("guid", out var guidObj) && guidObj is string)
-                {
-                    guid = (string)guidObj;
-                }
-
-                if (request.Arguments.TryGetValue("depth", out var depthObj))
-                {
-                    if (depthObj is int)
+                    if (paramsObj.TryGetValue("assetPath", out var assetPathObj) && assetPathObj is string)
                     {
-                        depth = (int)depthObj;
+                        assetPath = (string)assetPathObj;
                     }
-                    else if (depthObj is long)
-                    {
-                        depth = (int)(long)depthObj;
-                    }
-                }
 
-                if (request.Arguments.TryGetValue("direction", out var directionObj) && directionObj is string)
-                {
-                    direction = (string)directionObj;
+                    if (paramsObj.TryGetValue("guid", out var guidObj) && guidObj is string)
+                    {
+                        guid = (string)guidObj;
+                    }
+
+                    if (paramsObj.TryGetValue("depth", out var depthObj))
+                    {
+                        if (depthObj is int)
+                        {
+                            depth = (int)depthObj;
+                        }
+                        else if (depthObj is long)
+                        {
+                            depth = (int)(long)depthObj;
+                        }
+                    }
+
+                    if (paramsObj.TryGetValue("direction", out var directionObj) && directionObj is string)
+                    {
+                        direction = (string)directionObj;
+                    }
                 }
             }
 
             // Validate input
             if (string.IsNullOrEmpty(assetPath) && string.IsNullOrEmpty(guid))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", "Either 'assetPath' or 'guid' must be provided" }
-                    }
-                };
+                    { "error", "Either 'assetPath' or 'guid' must be provided" }
+                });
             }
 
             // Validate depth
@@ -95,42 +85,30 @@ namespace DatumStudios.EditorMCP.Tools
                 assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    return new ToolInvokeResponse
+                    return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                     {
-                        Tool = Definition.Id,
-                        Output = new Dictionary<string, object>
-                        {
-                            { "error", $"Asset with GUID '{guid}' not found" }
-                        }
-                    };
+                        { "error", $"Asset with GUID '{guid}' not found" }
+                    });
                 }
             }
 
             // Guard: Only process assets in Assets/ folder (never touch Packages/)
             if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/"))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Asset path must be in Assets/ folder. Package assets are not supported." }
-                    }
-                };
+                    { "error", $"Asset path must be in Assets/ folder. Package assets are not supported." }
+                });
             }
 
             // Validate path exists
             var pathGuid = AssetDatabase.AssetPathToGUID(assetPath);
             if (string.IsNullOrEmpty(pathGuid))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Asset at path '{assetPath}' not found" }
-                    }
-                };
+                    { "error", $"Asset at path '{assetPath}' not found" }
+                });
             }
 
             // Build dependency graph
@@ -147,21 +125,17 @@ namespace DatumStudios.EditorMCP.Tools
                 dependents = BuildDependentList(assetPath, depth);
             }
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "assetPath", assetPath },
-                    { "dependencies", dependencies.ToArray() },
-                    { "dependents", dependents.ToArray() }
-                }
+                { "assetPath", assetPath },
+                { "dependencies", dependencies.ToArray() },
+                { "dependents", dependents.ToArray() }
             };
 
-            return response;
+            return UnityEngine.JsonUtility.ToJson(result);
         }
 
-        private List<Dictionary<string, object>> BuildDependencyList(string assetPath, int maxDepth, bool recursive)
+        private static List<Dictionary<string, object>> BuildDependencyList(string assetPath, int maxDepth, bool recursive)
         {
             var result = new List<Dictionary<string, object>>();
             var visited = new HashSet<string>();
@@ -211,7 +185,7 @@ namespace DatumStudios.EditorMCP.Tools
             return result.OrderBy(d => (int)d["depth"]).ThenBy(d => (string)d["path"]).ToList();
         }
 
-        private List<Dictionary<string, object>> BuildDependentList(string assetPath, int maxDepth)
+        private static List<Dictionary<string, object>> BuildDependentList(string assetPath, int maxDepth)
         {
             var result = new List<Dictionary<string, object>>();
             var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
@@ -278,138 +252,6 @@ namespace DatumStudios.EditorMCP.Tools
 
             // Sort by depth, then by path for stable ordering
             return result.OrderBy(d => (int)d["depth"]).ThenBy(d => (string)d["path"]).ToList();
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "asset.dependencies.graph",
-                Name = "Asset Dependencies Graph",
-                Description = "Returns the dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.",
-                Category = "asset",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "assetPath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Path to the asset. Either assetPath or guid must be provided."
-                        }
-                    },
-                    {
-                        "guid",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "GUID of the asset. Either assetPath or guid must be provided."
-                        }
-                    },
-                    {
-                        "depth",
-                        new ToolParameterSchema
-                        {
-                            Type = "integer",
-                            Required = false,
-                            Description = "Maximum depth to traverse (default: 1, max: 10)",
-                            Default = 1,
-                            Minimum = 1,
-                            Maximum = 10
-                        }
-                    },
-                    {
-                        "direction",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Direction: 'dependencies' (what this asset depends on), 'dependents' (what depends on this), or 'both' (default: 'both')",
-                            Default = "both",
-                            Enum = new[] { "dependencies", "dependents", "both" }
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "assetPath",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Path to the asset"
-                        }
-                    },
-                    {
-                        "dependencies",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of assets this asset depends on",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "path",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependency asset path" }
-                                    },
-                                    {
-                                        "guid",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependency asset GUID" }
-                                    },
-                                    {
-                                        "type",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependency asset type" }
-                                    },
-                                    {
-                                        "depth",
-                                        new ToolOutputSchema { Type = "integer", Description = "Depth in dependency tree" }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "dependents",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of assets that depend on this asset",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "path",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependent asset path" }
-                                    },
-                                    {
-                                        "guid",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependent asset GUID" }
-                                    },
-                                    {
-                                        "type",
-                                        new ToolOutputSchema { Type = "string", Description = "Dependent asset type" }
-                                    },
-                                    {
-                                        "depth",
-                                        new ToolOutputSchema { Type = "integer", Description = "Depth in dependency tree" }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Analyzes asset dependency graph only; no assets are modified or moved."
-            };
         }
     }
 }

@@ -3,34 +3,23 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Audio;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: audio.mixer.list - Lists all AudioMixer assets in the project with their groups and snapshots.
     /// </summary>
-    public class AudioMixerListTool : IEditorMcpTool
+    [McpToolCategory("audio")]
+    public static class AudioMixerListTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Lists all AudioMixer assets in the project with their groups and snapshots. Concrete, familiar example of domain-specific tooling without mutation.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the AudioMixerListTool class.
-        /// </summary>
-        public AudioMixerListTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to list AudioMixers.
-        /// </summary>
-        /// <param name="request">The tool invocation request (no arguments required).</param>
-        /// <returns>AudioMixer list response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters (no parameters required).</param>
+        /// <returns>JSON string with AudioMixer list.</returns>
+        [McpTool("audio.mixer.list", "Lists all AudioMixer assets in the project with their groups and snapshots. Concrete, familiar example of domain-specific tooling without mutation.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             var mixers = new List<Dictionary<string, object>>();
 
@@ -62,31 +51,24 @@ namespace DatumStudios.EditorMCP.Tools
             }
             catch (System.Exception ex)
             {
-                // AudioMixer package might not be available
-                return new ToolInvokeResponse
+                // AudioMixer package might not be available - return empty list with error info
+                var errorResult = new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "mixers", new object[0] }
-                    },
-                    Diagnostics = new[] { $"AudioMixer API not available: {ex.Message}" }
+                    { "mixers", new object[0] },
+                    { "error", $"AudioMixer API not available: {ex.Message}" }
                 };
+                return UnityEngine.JsonUtility.ToJson(errorResult);
             }
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "mixers", mixers.ToArray() }
-                }
+                { "mixers", mixers.ToArray() }
             };
 
-            return response;
+            return UnityEngine.JsonUtility.ToJson(result);
         }
 
-        private Dictionary<string, object> SerializeMixer(AudioMixer mixer, string path, string guid)
+        private static Dictionary<string, object> SerializeMixer(AudioMixer mixer, string path, string guid)
         {
             var groups = new List<Dictionary<string, object>>();
             var snapshots = new List<Dictionary<string, object>>();
@@ -180,94 +162,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
 
             return snapshots;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "audio.mixer.list",
-                Name = "List Audio Mixers",
-                Description = "Lists all AudioMixer assets in the project with their groups and snapshots. Concrete, familiar example of domain-specific tooling without mutation.",
-                Category = "audio",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>(),
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "mixers",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of AudioMixer assets",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "path",
-                                        new ToolOutputSchema { Type = "string", Description = "Asset path" }
-                                    },
-                                    {
-                                        "guid",
-                                        new ToolOutputSchema { Type = "string", Description = "Asset GUID" }
-                                    },
-                                    {
-                                        "name",
-                                        new ToolOutputSchema { Type = "string", Description = "Mixer name" }
-                                    },
-                                    {
-                                        "groups",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "List of mixer groups",
-                                            Items = new ToolOutputSchema
-                                            {
-                                                Type = "object",
-                                                Properties = new Dictionary<string, ToolOutputSchema>
-                                                {
-                                                    {
-                                                        "name",
-                                                        new ToolOutputSchema { Type = "string", Description = "Group name" }
-                                                    },
-                                                    {
-                                                        "guid",
-                                                        new ToolOutputSchema { Type = "string", Description = "Group GUID" }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
-                                    {
-                                        "snapshots",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "List of snapshots",
-                                            Items = new ToolOutputSchema
-                                            {
-                                                Type = "object",
-                                                Properties = new Dictionary<string, ToolOutputSchema>
-                                                {
-                                                    {
-                                                        "name",
-                                                        new ToolOutputSchema { Type = "string", Description = "Snapshot name" }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads AudioMixer asset structure only; no mixer settings or snapshots are modified. Best-effort: may have limitations accessing all snapshots depending on Unity API availability."
-            };
         }
     }
 }

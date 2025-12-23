@@ -6,6 +6,7 @@ using UnityEngine;
 using DatumStudios.EditorMCP.Registry;
 using DatumStudios.EditorMCP.Server;
 using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP;
 
 namespace DatumStudios.EditorMCP.Diagnostics
 {
@@ -20,7 +21,7 @@ namespace DatumStudios.EditorMCP.Diagnostics
         /// <summary>
         /// Opens the EditorMCP Status window.
         /// </summary>
-        [MenuItem("Window/DatumStudio/EditorMCP Status")]
+        [MenuItem("Window/EditorMCP/Status")]
         public static void ShowWindow()
         {
             var window = GetWindow<EditorMcpStatusWindow>("EditorMCP Status");
@@ -46,9 +47,25 @@ namespace DatumStudios.EditorMCP.Diagnostics
 
             EditorGUILayout.Space(10);
 
-            // Version
+            // Version & Compatibility
             EditorGUILayout.LabelField("EditorMCP Core", EditorStyles.boldLabel);
             EditorGUILayout.LabelField("Version:", _server.ServerVersion);
+            
+            // Unity Version Compatibility
+            var isCompatible = VersionValidator.IsCompatible();
+            var compatibilityText = isCompatible ? "Compatible ✓" : $"Incompatible ✗ (Requires {VersionValidator.GetMinimumVersion()}+)";
+            var compatibilityColor = isCompatible ? Color.green : Color.red;
+            
+            var originalColor = GUI.color;
+            GUI.color = compatibilityColor;
+            EditorGUILayout.LabelField("Unity Version:", $"{Application.unityVersion} - {compatibilityText}");
+            GUI.color = originalColor;
+            
+            if (!isCompatible)
+            {
+                EditorGUILayout.HelpBox($"EditorMCP requires Unity {VersionValidator.GetMinimumVersion()}+. Please upgrade to Unity 2022.3 LTS or later.", MessageType.Error);
+            }
+            
             EditorGUILayout.Space(5);
 
             // Status

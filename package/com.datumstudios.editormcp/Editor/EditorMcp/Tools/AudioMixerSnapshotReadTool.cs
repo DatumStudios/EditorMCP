@@ -3,80 +3,66 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Audio;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: audio.mixer.snapshot.read - Returns the parameter values for a specific AudioMixer snapshot.
     /// </summary>
-    public class AudioMixerSnapshotReadTool : IEditorMcpTool
+    [McpToolCategory("audio")]
+    public static class AudioMixerSnapshotReadTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns the parameter values for a specific AudioMixer snapshot. Shows structured, numeric tooling without mutation.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the AudioMixerSnapshotReadTool class.
-        /// </summary>
-        public AudioMixerSnapshotReadTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to read snapshot parameters.
-        /// </summary>
-        /// <param name="request">The tool invocation request with mixerGuid or mixerPath and snapshotName.</param>
-        /// <returns>Snapshot parameters response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with "mixerPath" or "mixerGuid" and "snapshotName".</param>
+        /// <returns>JSON string with snapshot parameters.</returns>
+        [McpTool("audio.mixer.snapshot.read", "Returns the parameter values for a specific AudioMixer snapshot. Shows structured, numeric tooling without mutation.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string mixerPath = null;
             string mixerGuid = null;
             string snapshotName = null;
 
-            if (request.Arguments != null)
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("mixerPath", out var mixerPathObj) && mixerPathObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    mixerPath = (string)mixerPathObj;
-                }
+                    if (paramsObj.TryGetValue("mixerPath", out var mixerPathObj) && mixerPathObj is string)
+                    {
+                        mixerPath = (string)mixerPathObj;
+                    }
 
-                if (request.Arguments.TryGetValue("mixerGuid", out var mixerGuidObj) && mixerGuidObj is string)
-                {
-                    mixerGuid = (string)mixerGuidObj;
-                }
+                    if (paramsObj.TryGetValue("mixerGuid", out var mixerGuidObj) && mixerGuidObj is string)
+                    {
+                        mixerGuid = (string)mixerGuidObj;
+                    }
 
-                if (request.Arguments.TryGetValue("snapshotName", out var snapshotNameObj) && snapshotNameObj is string)
-                {
-                    snapshotName = (string)snapshotNameObj;
+                    if (paramsObj.TryGetValue("snapshotName", out var snapshotNameObj) && snapshotNameObj is string)
+                    {
+                        snapshotName = (string)snapshotNameObj;
+                    }
                 }
             }
 
             // Validate input
             if (string.IsNullOrEmpty(mixerPath) && string.IsNullOrEmpty(mixerGuid))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", "Either 'mixerPath' or 'mixerGuid' must be provided" }
-                    }
-                };
+                    { "error", "Either 'mixerPath' or 'mixerGuid' must be provided" }
+                });
             }
 
             if (string.IsNullOrEmpty(snapshotName))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", "'snapshotName' is required" }
-                    }
-                };
+                    { "error", "'snapshotName' is required" }
+                });
             }
 
             // Convert GUID to path if needed
@@ -85,28 +71,20 @@ namespace DatumStudios.EditorMCP.Tools
                 mixerPath = AssetDatabase.GUIDToAssetPath(mixerGuid);
                 if (string.IsNullOrEmpty(mixerPath))
                 {
-                    return new ToolInvokeResponse
+                    return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                     {
-                        Tool = Definition.Id,
-                        Output = new Dictionary<string, object>
-                        {
-                            { "error", $"AudioMixer with GUID '{mixerGuid}' not found" }
-                        }
-                    };
+                        { "error", $"AudioMixer with GUID '{mixerGuid}' not found" }
+                    });
                 }
             }
 
             // Guard: Only process assets in Assets/ folder (never touch Packages/)
             if (string.IsNullOrEmpty(mixerPath) || !mixerPath.StartsWith("Assets/"))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"AudioMixer path must be in Assets/ folder. Package assets are not supported." }
-                    }
-                };
+                    { "error", $"AudioMixer path must be in Assets/ folder. Package assets are not supported." }
+                });
             }
 
             // Load mixer
@@ -117,26 +95,18 @@ namespace DatumStudios.EditorMCP.Tools
             }
             catch (System.Exception ex)
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Failed to load AudioMixer: {ex.Message}" }
-                    }
-                };
+                    { "error", $"Failed to load AudioMixer: {ex.Message}" }
+                });
             }
 
             if (mixer == null)
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"AudioMixer at path '{mixerPath}' not found or is not an AudioMixer asset" }
-                    }
-                };
+                    { "error", $"AudioMixer at path '{mixerPath}' not found or is not an AudioMixer asset" }
+                });
             }
 
             // Find snapshot
@@ -148,27 +118,19 @@ namespace DatumStudios.EditorMCP.Tools
             }
             catch (System.Exception ex)
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Failed to find snapshot: {ex.Message}" },
-                        { "diagnostics", "Unity AudioMixer API may have limitations accessing snapshots" }
-                    }
-                };
+                    { "error", $"Failed to find snapshot: {ex.Message}" },
+                    { "diagnostics", new[] { "Unity AudioMixer API may have limitations accessing snapshots" } }
+                });
             }
 
             if (snapshot == null)
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Snapshot '{snapshotName}' not found in mixer '{mixerPath}'" }
-                    }
-                };
+                    { "error", $"Snapshot '{snapshotName}' not found in mixer '{mixerPath}'" }
+                });
             }
 
             // Read parameters (best-effort)
@@ -251,19 +213,13 @@ namespace DatumStudios.EditorMCP.Tools
             if (diagnostics.Count > 0)
             {
                 diagnostics.Add("Some parameter values may not be available due to Unity API limitations. This is a best-effort read operation.");
+                output["diagnostics"] = diagnostics.ToArray();
             }
 
-            var response = new ToolInvokeResponse
-            {
-                Tool = Definition.Id,
-                Output = output,
-                Diagnostics = diagnostics.Count > 0 ? diagnostics.ToArray() : null
-            };
-
-            return response;
+            return UnityEngine.JsonUtility.ToJson(output);
         }
 
-        private AudioMixerSnapshot FindSnapshotByName(AudioMixer mixer, string snapshotName)
+        private static AudioMixerSnapshot FindSnapshotByName(AudioMixer mixer, string snapshotName)
         {
             try
             {
@@ -297,7 +253,7 @@ namespace DatumStudios.EditorMCP.Tools
             return null;
         }
 
-        private List<string> GetExposedParameters(AudioMixer mixer)
+        private static List<string> GetExposedParameters(AudioMixer mixer)
         {
             var parameters = new List<string>();
 
@@ -328,7 +284,7 @@ namespace DatumStudios.EditorMCP.Tools
             return parameters;
         }
 
-        private Dictionary<string, string> GetExposedParametersWithGuids(AudioMixer mixer)
+        private static Dictionary<string, string> GetExposedParametersWithGuids(AudioMixer mixer)
         {
             var parameters = new Dictionary<string, string>();
 
@@ -361,7 +317,7 @@ namespace DatumStudios.EditorMCP.Tools
             return parameters;
         }
 
-        private string GetParameterGroup(AudioMixer mixer, string parameterName)
+        private static string GetParameterGroup(AudioMixer mixer, string parameterName)
         {
             try
             {
@@ -386,114 +342,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
 
             return null;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "audio.mixer.snapshot.read",
-                Name = "Read Audio Mixer Snapshot",
-                Description = "Returns the parameter values for a specific AudioMixer snapshot. Shows structured, numeric tooling without mutation.",
-                Category = "audio",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "mixerPath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Path to the AudioMixer asset. Either mixerPath or mixerGuid must be provided."
-                        }
-                    },
-                    {
-                        "mixerGuid",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "GUID of the AudioMixer asset. Either mixerPath or mixerGuid must be provided."
-                        }
-                    },
-                    {
-                        "snapshotName",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = true,
-                            Description = "Name of the snapshot to read"
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "mixerPath",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Path to the AudioMixer asset"
-                        }
-                    },
-                    {
-                        "snapshotName",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Name of the snapshot that was read"
-                        }
-                    },
-                    {
-                        "parameters",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of exposed parameters and their values",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "name",
-                                        new ToolOutputSchema { Type = "string", Description = "Parameter name" }
-                                    },
-                                    {
-                                        "value",
-                                        new ToolOutputSchema { Type = "number", Description = "Parameter value" }
-                                    },
-                                    {
-                                        "group",
-                                        new ToolOutputSchema { Type = "string", Description = "Mixer group name (best-effort)" }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "diagnostics",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "Diagnostic messages about limitations or issues encountered",
-                            Items = new ToolOutputSchema { Type = "string" }
-                        }
-                    },
-                    {
-                        "note",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Note about best-effort limitations"
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads snapshot parameter values only; no mixer parameters or snapshots are modified. Best-effort: Unity API limitations may prevent reading all parameter values. Diagnostics field will indicate any issues encountered."
-            };
         }
     }
 }

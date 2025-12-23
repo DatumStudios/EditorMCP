@@ -26,13 +26,51 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 **Outputs**:
 ```json
 {
-  "serverVersion": "string",
-  "unityVersion": "string",
-  "platform": "string",
-  "enabledToolCategories": ["string"],
-  "tier": "string"
+  "success": true,
+  "serverVersion": "1.0.0",
+  "unityVersion": "2022.3.20f1",
+  "minUnityVersion": "2022.3.0f1",
+  "isCompatible": true,
+  "platform": "WindowsEditor",
+  "enabledToolCategories": ["mcp", "project", "scene", "go", "asset", "audio", "editor"],
+  "tier": "core",
+  "toolCount": 18
 }
 ```
+
+**Output Fields:**
+- `success` (boolean): Always `true` if server is running
+- `serverVersion` (string): EditorMCP package version (e.g., "1.0.0")
+- `unityVersion` (string): Current Unity version (e.g., "2022.3.20f1")
+- `minUnityVersion` (string): Minimum required Unity version (e.g., "2022.3.0f1")
+- `isCompatible` (boolean): `true` if current Unity version meets minimum requirement
+- `platform` (string): Unity platform identifier (e.g., "WindowsEditor", "MacEditor", "LinuxEditor")
+- `enabledToolCategories` (array of strings): List of tool categories available
+- `tier` (string): Current license tier ("core", "pro", "studio", "enterprise")
+- `toolCount` (integer): Total number of tools available at current tier
+
+**Implementation:**
+```csharp
+[McpTool("mcp.server.info")]
+public static string ServerInfo() {
+    return JsonUtility.ToJson(new {
+        success = true,
+        serverVersion = "1.0.0",
+        unityVersion = Application.unityVersion,
+        minUnityVersion = VersionValidator.GetMinimumVersion(),
+        isCompatible = VersionValidator.IsCompatible(),
+        platform = Application.platform.ToString(),
+        enabledToolCategories = ToolRegistry.GetCategories(),
+        tier = LicenseManager.CurrentTier.ToString().ToLower(),
+        toolCount = ToolRegistry.ToolCount
+    });
+}
+```
+
+**Buyer Value:**
+- Cursor/Claude can check `isCompatible` → provides "Upgrade Unity" guidance if false
+- Version information helps diagnose compatibility issues
+- Tool count indicates tier availability
 
 **Safety Note**: Read-only. Returns metadata only; no project state is modified.
 
@@ -313,10 +351,17 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 
 **Inputs**:
 - `hierarchyPath` (optional, string): Hierarchy path pattern with wildcards (e.g., "Root/Enemies/*", "Root/**/Enemy")
-- `componentType` (optional, string): Filter by component type name (e.g., "UnityEngine.BoxCollider")
+  - `*` = direct children only (matches single path segment: `[^/]*`)
+  - `**` = recursive descendants (matches zero or more path segments: `.*?`)
+  - Examples: `"Root/Enemies/*"` matches `Root/Enemies/Goblin`, `Root/Enemies/Orc` (direct children)
+  - Examples: `"Root/**/Enemy"` matches `Root/Enemies/Goblin/Enemy`, `Root/Enemies/Orc/Enemy` (any descendant)
+- `componentType` (optional, string): Filter by component type name
+  - Accepts: `"BoxCollider"` or `"UnityEngine.BoxCollider"` (both formats supported)
+  - Output always uses full namespace: `"UnityEngine.BoxCollider"`
 - `tag` (optional, string): Filter by tag name (e.g., "Enemy")
 - `layer` (optional, integer): Filter by layer index
-- `namePattern` (optional, string): Filter by GameObject name pattern (supports wildcards)
+- `namePattern` (optional, string): Filter by GameObject name pattern (supports wildcards, e.g., "Gob*")
+- `maxResults` (optional, integer): Maximum number of results to return (default: 100, performance safeguard)
 
 **Outputs**:
 ```json
@@ -336,15 +381,24 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 ```
 
 **Validation Rules**:
-- Requires an active scene to be loaded
+- Requires an active scene to be loaded (uses `EditorSceneManager.GetActiveScene()`, no `scenePath` parameter)
 - Hierarchy path patterns support `*` (single level) and `**` (recursive) wildcards
+- Wildcard algorithm: Convert glob to regex (`*` → `[^/]*`, `**` → `.*?`)
 - All filters are optional; multiple filters combine with AND logic
+- Results are sorted by hierarchy path for deterministic output
+- Performance: Limited by `maxResults` parameter (default: 100)
 
 **Error Handling**:
 - No active scene: `success = false`, `error = "No active scene loaded"`
 - Invalid hierarchy path pattern: `success = false`, `error = "Invalid hierarchy path pattern"`
 
 **Safety Note**: Read-only discovery operation. Searches active scene hierarchy only; no objects are selected, modified, or created. Universal debugging/inspection tool used daily by all developers.
+
+**Implementation Notes:**
+- Uses `HierarchyResolver.FindByPath()` for path resolution
+- Uses `Regex.IsMatch()` with glob-to-regex conversion for wildcard matching
+- Component type resolution: Try `Type.GetType(componentType)` first, then `Type.GetType($"UnityEngine.{componentType}, UnityEngine")`
+- JSON serialization: `UnityEngine.JsonUtility` (Unity 2022.3 native)
 
 ---
 
@@ -378,7 +432,16 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 - Parent not found: `success = false`, `error = "Parent GameObject not found"`
 - Circular hierarchy: `success = false`, `error = "Cannot set parent to descendant"`
 
-**Safety Note**: Single-object hierarchy modification. Uses `Undo.RecordObject()` and `Undo.SetTransformParent()` for undo support. Low-risk operation that indies need constantly for basic hierarchy management. Not a batch operation.
+**Safety Note**: Single-object hierarchy modification. Uses `Undo.SetTransformParent(transform, newParent, "go.setParent")` (Unity recommended API) with `UndoScope` pattern for undo support. Low-risk operation that indies need constantly for basic hierarchy management. Not a batch operation.
+
+**Implementation Notes:**
+- Unity API: `Undo.SetTransformParent(transform, newParent, "EditorMCP: Set Parent")`
+- Uses `UndoScope` pattern: `using var undo = new UndoScope("go.setParent");`
+- Circular hierarchy detection: Traverse up from potential parent to root, check if child is encountered
+- Scene root reparenting: When `parentPath` is empty/null, `parent = null` (reparent to scene root)
+- Uses `HierarchyResolver.FindByPath()` for path resolution
+- Active scene only: Uses `EditorSceneManager.GetActiveScene()`, no `scenePath` parameter
+- JSON serialization: `UnityEngine.JsonUtility` (Unity 2022.3 native)
 
 ---
 
@@ -389,21 +452,45 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 **Inputs**:
 - `hierarchyPath` (required, string): Hierarchy path to the GameObject (e.g., "Root/Enemies/Goblin")
 - `includeProperties` (optional, boolean): Include serialized field names and types (default: false)
+  - When `false`: Only returns `propertyCount` per component
+  - When `true`: Includes top-level serialized fields only (no nesting, max 50 properties per component)
 
-**Outputs**:
+**Outputs** (includeProperties=false, default):
 ```json
 {
+  "success": true,
   "hierarchyPath": "Root/Enemies/Goblin",
   "components": [
     {
       "type": "UnityEngine.BoxCollider",
       "instanceId": 67890,
-      "propertyCount": 5
+      "propertyCount": 8
     },
     {
       "type": "UnityEngine.Rigidbody",
       "instanceId": 67891,
       "propertyCount": 12
+    }
+  ],
+  "activeScene": "Assets/Scenes/Main.unity"
+}
+```
+
+**Outputs** (includeProperties=true):
+```json
+{
+  "success": true,
+  "hierarchyPath": "Root/Enemies/Goblin",
+  "components": [
+    {
+      "type": "UnityEngine.BoxCollider",
+      "instanceId": 67890,
+      "propertyCount": 8,
+      "serializedFields": [
+        {"name": "m_Size", "type": "Vector3", "value": {"x": 1, "y": 1, "z": 1}},
+        {"name": "m_Center", "type": "Vector3", "value": {"x": 0, "y": 0, "z": 0}},
+        {"name": "m_IsTrigger", "type": "boolean", "value": false}
+      ]
     }
   ],
   "activeScene": "Assets/Scenes/Main.unity"
@@ -419,6 +506,14 @@ This document defines the canonical list of 18 tools for EditorMCP Core v0.1. Mo
 - GameObject not found: `success = false`, `error = "GameObject not found"`
 
 **Safety Note**: Read-only component inspection. Reads component data from active scene only; no components or properties are modified. Universal debugging tool that complements `go.find` for discovery workflows.
+
+**Implementation Notes:**
+- Uses `HierarchyResolver.FindByPath()` for GameObject lookup
+- Property serialization: Uses `SerializedObject` for property access (top-level only, no nesting)
+- Property limit: Max 50 properties per component (performance safeguard)
+- Default: `includeProperties = false` (Core tier simplicity)
+- Active scene only: Uses `EditorSceneManager.GetActiveScene()`, no `scenePath` parameter
+- JSON serialization: `UnityEngine.JsonUtility` (Unity 2022.3 native)
 
 ---
 
@@ -687,4 +782,162 @@ These limitations are documented in tool-specific notes and communicated via the
 **Testing Recommendations:**
 - Unity 2022.3.20f1 LTS (minimum version)
 - Unity 6000.0.0f1 LTS (latest Unity 6)
+
+---
+
+## Implementation Infrastructure
+
+### HierarchyResolver (Shared Helper)
+
+**Location:** `Editor/EditorMcp/Helpers.cs` (shared across all tiers)
+
+**Purpose:** Provides consistent hierarchy path resolution for all tools.
+
+**Methods:**
+- `FindByPath(string path)` - Finds GameObject by hierarchy path in active scene
+- `GetFullPath(this Transform transform)` - Gets full hierarchy path for a Transform
+
+**Implementation:**
+```csharp
+public static class HierarchyResolver {
+    public static GameObject FindByPath(string path) {
+        if (string.IsNullOrEmpty(path)) return null;
+        
+        var scene = EditorSceneManager.GetActiveScene();
+        if (!scene.isLoaded) return null;
+        
+        var pathParts = path.Split('/');
+        if (pathParts.Length == 0) return null;
+        
+        // Find root GameObject
+        var rootGo = scene.GetRootGameObjects()
+            .FirstOrDefault(go => go.name == pathParts[0]);
+        if (rootGo == null) return null;
+        
+        // Navigate down hierarchy using Transform.Find()
+        Transform current = rootGo.transform;
+        for (int i = 1; i < pathParts.Length; i++) {
+            current = current.Find(pathParts[i]);
+            if (current == null) return null;
+        }
+        
+        return current.gameObject;
+    }
+    
+    public static string GetFullPath(this Transform transform) {
+        if (transform == null) return "";
+        
+        var path = new List<string>();
+        var current = transform;
+        while (current != null) {
+            path.Add(current.name);
+            current = current.parent;
+        }
+        path.Reverse();
+        return string.Join("/", path);
+    }
+}
+```
+
+**Usage:**
+- Used by `go.find`, `go.setParent`, `component.list` (Core tier)
+- Used by future Pro/Studio/Enterprise tools
+- Single implementation ensures consistency across all tiers
+
+### Wildcard Pattern Matching
+
+**Algorithm:** Glob-to-Regex conversion (Unity QuickSearch pattern)
+
+**Pattern Rules:**
+- `*` → `[^/]*` (matches single path segment - direct children only)
+- `**` → `.*?` (matches zero or more path segments - recursive descendants)
+- `?` → `.` (single character - optional, for future expansion)
+
+**Conversion Function:**
+```csharp
+private static string ConvertGlobToRegex(string glob) {
+    if (string.IsNullOrEmpty(glob)) return null;
+    return "^" + Regex.Escape(glob)
+        .Replace(@"\*\*", ".*?")      // ** → recursive (non-greedy)
+        .Replace(@"\*", @"[^/]*")     // * → direct children (single segment)
+        .Replace(@"\\", @"\") + "$";
+}
+```
+
+**Examples:**
+- `"Root/Enemies/*"` → Matches: `Root/Enemies/Goblin`, `Root/Enemies/Orc` (direct children)
+- `"Root/**/Enemy"` → Matches: `Root/Enemies/Goblin/Enemy`, `Root/Enemies/Orc/Enemy` (any descendant)
+- `"Root/Enemies/Gob*"` → Matches: `Root/Enemies/Goblin`, `Root/Enemies/GoblinKing` (name pattern)
+
+### Component Type Resolution
+
+**Input Format Support:**
+- Short name: `"BoxCollider"` → Resolved to `UnityEngine.BoxCollider`
+- Full name: `"UnityEngine.BoxCollider"` → Direct match
+
+**Resolution Algorithm:**
+```csharp
+private static Type ResolveComponentType(string typeName) {
+    // Try direct match first
+    var type = Type.GetType(typeName);
+    if (type != null && type.IsSubclassOf(typeof(Component)))
+        return type;
+    
+    // Try with UnityEngine namespace
+    type = Type.GetType($"UnityEngine.{typeName}, UnityEngine");
+    if (type != null && type.IsSubclassOf(typeof(Component)))
+        return type;
+    
+    return null;
+}
+```
+
+**Output Format:**
+- Always use full namespace: `"UnityEngine.BoxCollider"`
+- Consistent with Unity's type system
+- Matches existing tool outputs
+
+### Active Scene vs Scene Path
+
+**Core Tools (Active Scene Only):**
+- `go.find` - Works ONLY on `EditorSceneManager.GetActiveScene()`
+- `go.setParent` - Works ONLY on active scene
+- `component.list` - Works ONLY on active scene
+- **No `scenePath` parameter** - Simpler API, faster execution, common use case
+
+**Scene Tools (Scene Path Parameter):**
+- `scene.objects.find` - Accepts `scenePath` parameter (can open scenes additively)
+- `scene.components.list` - Accepts `scenePath` parameter
+- `scene.hierarchy.dump` - Accepts `scenePath` parameter
+- **Explicit scene path** - For batch operations and scene management
+
+**Error Handling:**
+- If no active scene: `{"success": false, "error": "No active scene loaded. Open a scene first."}`
+- Use `EditorSceneManager.GetActiveScene().isLoaded` to check
+
+### JSON Serialization
+
+**Library:** `UnityEngine.JsonUtility` (Unity 2022.3+ native, no dependencies)
+
+**Usage:**
+- `JsonUtility.FromJson<T>(json)` - Deserialize input
+- `JsonUtility.ToJson(object)` - Serialize output
+- Standard Unity pattern, no external dependencies
+
+**Error Response Format:**
+```json
+{
+  "success": false,
+  "error": "Error message here",
+  "code": "ERROR_CODE"
+}
+```
+
+**Success Response Format:**
+```json
+{
+  "success": true,
+  // ... tool-specific output
+}
+```
 

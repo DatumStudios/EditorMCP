@@ -5,40 +5,31 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using DatumStudios.EditorMCP.Diagnostics;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: project.references.missing - Detects missing script references and broken asset references.
     /// </summary>
-    public class ProjectReferencesMissingTool : IEditorMcpTool
+    [McpToolCategory("project")]
+    public static class ProjectReferencesMissingTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Detects missing script references and broken asset references in the project. High-value diagnostic tool with zero write risk.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the ProjectReferencesMissingTool class.
-        /// </summary>
-        public ProjectReferencesMissingTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to detect missing references.
-        /// </summary>
-        /// <param name="request">The tool invocation request with optional scope parameter.</param>
-        /// <returns>Missing references response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with optional "scope" string ("all", "scenes", "prefabs", "assets").</param>
+        /// <returns>JSON string with missing references.</returns>
+        [McpTool("project.references.missing", "Detects missing script references and broken asset references in the project. High-value diagnostic tool with zero write risk.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string scope = "all";
 
-            if (request.Arguments != null && request.Arguments.TryGetValue("scope", out var scopeObj))
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (scopeObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null && paramsObj.TryGetValue("scope", out var scopeObj) && scopeObj is string)
                 {
                     scope = (string)scopeObj;
                 }
@@ -81,21 +72,21 @@ namespace DatumStudios.EditorMCP.Tools
                 diagnostics.Add(timeGuard.GetPartialResultMessage(missingScripts.Count + brokenReferences.Count));
             }
 
-            var response = new ToolInvokeResponse
+            var output = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "missingScripts", missingScripts.ToArray() },
-                    { "brokenReferences", brokenReferences.ToArray() }
-                },
-                Diagnostics = diagnostics.Count > 0 ? diagnostics.ToArray() : null
+                { "missingScripts", missingScripts.ToArray() },
+                { "brokenReferences", brokenReferences.ToArray() }
             };
 
-            return response;
+            if (diagnostics.Count > 0)
+            {
+                output["diagnostics"] = diagnostics.ToArray();
+            }
+
+            return UnityEngine.JsonUtility.ToJson(output);
         }
 
-        private void DetectMissingInScenes(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
+        private static void DetectMissingInScenes(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
         {
             // Restrict to Assets folder to avoid scanning Packages/ (which causes "no meta file" errors)
             var sceneGuids = AssetDatabase.FindAssets("t:Scene", new[] { "Assets" });
@@ -142,7 +133,7 @@ namespace DatumStudios.EditorMCP.Tools
             }
         }
 
-        private void DetectMissingInPrefabs(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
+        private static void DetectMissingInPrefabs(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
         {
             // Restrict to Assets folder to avoid scanning Packages/ (which causes "no meta file" errors)
             var prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
@@ -185,7 +176,7 @@ namespace DatumStudios.EditorMCP.Tools
             }
         }
 
-        private void DetectMissingInAssets(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
+        private static void DetectMissingInAssets(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)
         {
             // Best-effort: check ScriptableObjects and other assets for missing references
             // This is limited as we can't easily detect all missing references in all asset types
@@ -193,7 +184,7 @@ namespace DatumStudios.EditorMCP.Tools
             timeGuard.Check();
         }
 
-        private void DetectMissingInGameObject(GameObject obj, string assetPath, List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard)
+        private static void DetectMissingInGameObject(GameObject obj, string assetPath, List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard)
         {
             timeGuard.Check();
 
@@ -220,7 +211,7 @@ namespace DatumStudios.EditorMCP.Tools
             DetectMissingInGameObjectRecursive(obj, assetPath, missingScripts, brokenReferences, timeGuard, 0, maxDepth);
         }
 
-        private void DetectMissingInGameObjectRecursive(GameObject obj, string assetPath, List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, int depth, int maxDepth)
+        private static void DetectMissingInGameObjectRecursive(GameObject obj, string assetPath, List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, int depth, int maxDepth)
         {
             if (depth >= maxDepth)
                 return;
@@ -253,7 +244,7 @@ namespace DatumStudios.EditorMCP.Tools
             }
         }
 
-        private string GetHierarchyPath(GameObject obj)
+        private static string GetHierarchyPath(GameObject obj)
         {
             var path = obj.name;
             var parent = obj.transform.parent;
@@ -263,97 +254,6 @@ namespace DatumStudios.EditorMCP.Tools
                 parent = parent.parent;
             }
             return path;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "project.references.missing",
-                Name = "Detect Missing References",
-                Description = "Detects missing script references and broken asset references in the project. High-value diagnostic tool with zero write risk.",
-                Category = "project",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "scope",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Scope to search: 'all', 'scenes', 'prefabs', or 'assets'. Default: 'all'.",
-                            Default = "all",
-                            Enum = new[] { "all", "scenes", "prefabs", "assets" }
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "missingScripts",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of missing script references",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "path",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Asset path containing the missing script"
-                                        }
-                                    },
-                                    {
-                                        "gameObjectPath",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Hierarchy path to the GameObject with missing script"
-                                        }
-                                    },
-                                    {
-                                        "componentIndex",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "integer",
-                                            Description = "Component index where script is missing"
-                                        }
-                                    },
-                                    {
-                                        "context",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Human-readable context about the missing script"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "brokenReferences",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of broken asset references (currently empty, reserved for future enhancement)",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object"
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Scans for missing references only; does not attempt to fix or modify any assets. Best-effort detection; may not catch all missing references."
-            };
         }
     }
 }

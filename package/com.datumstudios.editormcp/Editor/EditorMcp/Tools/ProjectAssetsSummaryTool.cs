@@ -4,34 +4,23 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using DatumStudios.EditorMCP.Diagnostics;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: project.assets.summary - Returns a summary of project assets by type.
     /// </summary>
-    public class ProjectAssetsSummaryTool : IEditorMcpTool
+    [McpToolCategory("project")]
+    public static class ProjectAssetsSummaryTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns a summary of project assets including counts by asset type, large assets, and unreferenced asset detection. Provides project health insights without mutation.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the ProjectAssetsSummaryTool class.
-        /// </summary>
-        public ProjectAssetsSummaryTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to return asset summary.
-        /// </summary>
-        /// <param name="request">The tool invocation request (no arguments required).</param>
-        /// <returns>Asset summary response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters (no parameters required).</param>
+        /// <returns>JSON string with asset summary.</returns>
+        [McpTool("project.assets.summary", "Returns a summary of project assets including counts by asset type, large assets, and unreferenced asset detection. Provides project health insights without mutation.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             var timeGuard = new TimeGuard(TimeGuard.AssetScanMaxMilliseconds);
             var diagnostics = new List<string>();
@@ -118,88 +107,18 @@ namespace DatumStudios.EditorMCP.Tools
                 sortedByType[key] = counts[key];
             }
 
-            var response = new ToolInvokeResponse
+            var output = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "totalAssets", totalAssets },
-                    { "byType", sortedByType }
-                },
-                Diagnostics = diagnostics.Count > 0 ? diagnostics.ToArray() : null
+                { "totalAssets", totalAssets },
+                { "byType", sortedByType }
             };
 
-            return response;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
+            if (diagnostics.Count > 0)
             {
-                Id = "project.assets.summary",
-                Name = "Project Assets Summary",
-                Description = "Returns a summary of project assets including counts by asset type, large assets, and unreferenced asset detection. Provides project health insights without mutation.",
-                Category = "project",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>(),
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "totalAssets",
-                        new ToolOutputSchema
-                        {
-                            Type = "integer",
-                            Description = "Total number of assets counted"
-                        }
-                    },
-                    {
-                        "byType",
-                        new ToolOutputSchema
-                        {
-                            Type = "object",
-                            Description = "Asset counts by type",
-                            Properties = new Dictionary<string, ToolOutputSchema>
-                            {
-                                {
-                                    "Scene",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of Scene assets" }
-                                },
-                                {
-                                    "Prefab",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of Prefab assets" }
-                                },
-                                {
-                                    "ScriptableObject",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of ScriptableObject assets" }
-                                },
-                                {
-                                    "Material",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of Material assets" }
-                                },
-                                {
-                                    "Texture",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of Texture assets" }
-                                },
-                                {
-                                    "Audio",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of AudioClip assets" }
-                                },
-                                {
-                                    "Animation",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of AnimationClip assets" }
-                                },
-                                {
-                                    "Timeline",
-                                    new ToolOutputSchema { Type = "integer", Description = "Number of Timeline/PlayableAsset assets" }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Analyzes asset database only; no assets are modified or deleted. Timeline detection is best-effort and may return 0 if Timeline package is not installed."
-            };
+                output["diagnostics"] = diagnostics.ToArray();
+            }
+
+            return UnityEngine.JsonUtility.ToJson(output);
         }
     }
 }

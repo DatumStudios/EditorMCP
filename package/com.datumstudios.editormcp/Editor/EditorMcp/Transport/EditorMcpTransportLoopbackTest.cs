@@ -20,7 +20,7 @@ namespace DatumStudios.EditorMCP.Transport
         /// <summary>
         /// Runs the transport loopback self-test.
         /// </summary>
-        [MenuItem("Tools/DatumStudio/EditorMCP/Run Transport Loopback Self-Test")]
+        [MenuItem("Window/EditorMCP/Run Self-Test")]
         public static void RunTest()
         {
             try

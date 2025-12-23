@@ -1,62 +1,52 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: asset.info - Returns detailed information about a specific asset.
     /// </summary>
-    public class AssetInfoTool : IEditorMcpTool
+    [McpToolCategory("asset")]
+    public static class AssetInfoTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns detailed information about a specific asset including type, dependencies, and import settings. Demonstrates asset graph awareness without mutation.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the AssetInfoTool class.
-        /// </summary>
-        public AssetInfoTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to return asset information.
-        /// </summary>
-        /// <param name="request">The tool invocation request with assetPath or guid.</param>
-        /// <returns>Asset information response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with "assetPath" or "guid" string.</param>
+        /// <returns>JSON string with asset information.</returns>
+        [McpTool("asset.info", "Returns detailed information about a specific asset including type, dependencies, and import settings. Demonstrates asset graph awareness without mutation.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string assetPath = null;
             string guid = null;
 
-            if (request.Arguments != null)
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("assetPath", out var assetPathObj) && assetPathObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    assetPath = (string)assetPathObj;
-                }
+                    if (paramsObj.TryGetValue("assetPath", out var assetPathObj) && assetPathObj is string)
+                    {
+                        assetPath = (string)assetPathObj;
+                    }
 
-                if (request.Arguments.TryGetValue("guid", out var guidObj) && guidObj is string)
-                {
-                    guid = (string)guidObj;
+                    if (paramsObj.TryGetValue("guid", out var guidObj) && guidObj is string)
+                    {
+                        guid = (string)guidObj;
+                    }
                 }
             }
 
             // Validate input
             if (string.IsNullOrEmpty(assetPath) && string.IsNullOrEmpty(guid))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", "Either 'assetPath' or 'guid' must be provided" }
-                    }
-                };
+                    { "error", "Either 'assetPath' or 'guid' must be provided" }
+                });
             }
 
             // Convert GUID to path if needed
@@ -65,55 +55,39 @@ namespace DatumStudios.EditorMCP.Tools
                 assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    return new ToolInvokeResponse
+                    return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                     {
-                        Tool = Definition.Id,
-                        Output = new Dictionary<string, object>
-                        {
-                            { "error", $"Asset with GUID '{guid}' not found" }
-                        }
-                    };
+                        { "error", $"Asset with GUID '{guid}' not found" }
+                    });
                 }
             }
 
             // Guard: Only process assets in Assets/ folder (never touch Packages/)
             if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/"))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Asset path must be in Assets/ folder. Package assets are not supported." }
-                    }
-                };
+                    { "error", $"Asset path must be in Assets/ folder. Package assets are not supported." }
+                });
             }
 
             // Validate path exists
             var pathGuid = AssetDatabase.AssetPathToGUID(assetPath);
             if (string.IsNullOrEmpty(pathGuid))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"Asset at path '{assetPath}' not found" }
-                    }
-                };
+                    { "error", $"Asset at path '{assetPath}' not found" }
+                });
             }
 
             // If GUID was provided, verify it matches
             if (!string.IsNullOrEmpty(guid) && pathGuid != guid)
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"GUID '{guid}' does not match asset at path '{assetPath}'" }
-                    }
-                };
+                    { "error", $"GUID '{guid}' does not match asset at path '{assetPath}'" }
+                });
             }
 
             // Get asset information
@@ -155,100 +129,7 @@ namespace DatumStudios.EditorMCP.Tools
                 output["importerType"] = null;
             }
 
-            var response = new ToolInvokeResponse
-            {
-                Tool = Definition.Id,
-                Output = output
-            };
-
-            return response;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "asset.info",
-                Name = "Asset Info",
-                Description = "Returns detailed information about a specific asset including type, dependencies, and import settings. Demonstrates asset graph awareness without mutation.",
-                Category = "asset",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "assetPath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Path to the asset (e.g., 'Assets/Textures/Logo.png'). Either assetPath or guid must be provided."
-                        }
-                    },
-                    {
-                        "guid",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "GUID of the asset. Either assetPath or guid must be provided."
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "path",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Asset path"
-                        }
-                    },
-                    {
-                        "guid",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Asset GUID"
-                        }
-                    },
-                    {
-                        "type",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Main asset type name"
-                        }
-                    },
-                    {
-                        "mainObjectName",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Name of the main asset object"
-                        }
-                    },
-                    {
-                        "dependencyCount",
-                        new ToolOutputSchema
-                        {
-                            Type = "integer",
-                            Description = "Number of direct dependencies"
-                        }
-                    },
-                    {
-                        "importerType",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Asset importer type name (null if no importer)"
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads asset metadata and import settings only; no asset files or import settings are modified."
-            };
+            return UnityEngine.JsonUtility.ToJson(output);
         }
     }
 }

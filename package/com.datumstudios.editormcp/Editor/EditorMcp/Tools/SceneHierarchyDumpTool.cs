@@ -3,50 +3,44 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: scene.hierarchy.dump - Returns the complete GameObject hierarchy for a scene.
     /// </summary>
-    public class SceneHierarchyDumpTool : IEditorMcpTool
+    [McpToolCategory("scene")]
+    public static class SceneHierarchyDumpTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns the complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the SceneHierarchyDumpTool class.
-        /// </summary>
-        public SceneHierarchyDumpTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to dump scene hierarchy.
-        /// </summary>
-        /// <param name="request">The tool invocation request with optional scenePath and includeInactive.</param>
-        /// <returns>Scene hierarchy response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with optional "scenePath" string and "includeInactive" boolean.</param>
+        /// <returns>JSON string with scene hierarchy.</returns>
+        [McpTool("scene.hierarchy.dump", "Returns the complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string scenePath = null;
             bool includeInactive = false;
 
-            if (request.Arguments != null)
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("scenePath", out var scenePathObj) && scenePathObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    scenePath = (string)scenePathObj;
-                }
-
-                if (request.Arguments.TryGetValue("includeInactive", out var includeInactiveObj))
-                {
-                    if (includeInactiveObj is bool)
+                    if (paramsObj.TryGetValue("scenePath", out var scenePathObj) && scenePathObj is string)
                     {
-                        includeInactive = (bool)includeInactiveObj;
+                        scenePath = (string)scenePathObj;
+                    }
+
+                    if (paramsObj.TryGetValue("includeInactive", out var includeInactiveObj))
+                    {
+                        if (includeInactiveObj is bool)
+                        {
+                            includeInactive = (bool)includeInactiveObj;
+                        }
                     }
                 }
             }
@@ -96,20 +90,16 @@ namespace DatumStudios.EditorMCP.Tools
                 EditorSceneManager.CloseScene(scene, false);
             }
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "scenePath", scenePath ?? "" },
-                    { "rootObjects", rootObjects.ToArray() }
-                }
+                { "scenePath", scenePath ?? "" },
+                { "rootObjects", rootObjects.ToArray() }
             };
 
-            return response;
+            return UnityEngine.JsonUtility.ToJson(result);
         }
 
-        private Dictionary<string, object> SerializeGameObject(GameObject obj, bool includeInactive)
+        private static Dictionary<string, object> SerializeGameObject(GameObject obj, bool includeInactive)
         {
             var components = new List<string>();
             var componentInstanceIds = new List<int>();
@@ -165,7 +155,7 @@ namespace DatumStudios.EditorMCP.Tools
             return node;
         }
 
-        private string GetHierarchyPath(GameObject obj)
+        private static string GetHierarchyPath(GameObject obj)
         {
             var path = obj.name;
             var parent = obj.transform.parent;
@@ -175,108 +165,6 @@ namespace DatumStudios.EditorMCP.Tools
                 parent = parent.parent;
             }
             return path;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "scene.hierarchy.dump",
-                Name = "Dump Scene Hierarchy",
-                Description = "Returns the complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.",
-                Category = "scene",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "scenePath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Path to the scene file (e.g., 'Assets/Scenes/Main.unity'). If not provided, uses currently active scene."
-                        }
-                    },
-                    {
-                        "includeInactive",
-                        new ToolParameterSchema
-                        {
-                            Type = "boolean",
-                            Required = false,
-                            Description = "If true, includes inactive GameObjects in the hierarchy. Default: false.",
-                            Default = false
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "scenePath",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Path to the scene that was dumped"
-                        }
-                    },
-                    {
-                        "rootObjects",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "Root GameObjects in the scene",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "name",
-                                        new ToolOutputSchema { Type = "string", Description = "GameObject name" }
-                                    },
-                                    {
-                                        "path",
-                                        new ToolOutputSchema { Type = "string", Description = "Hierarchy path" }
-                                    },
-                                    {
-                                        "active",
-                                        new ToolOutputSchema { Type = "boolean", Description = "Active state" }
-                                    },
-                                    {
-                                        "components",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "Component type names",
-                                            Items = new ToolOutputSchema { Type = "string" }
-                                        }
-                                    },
-                                    {
-                                        "componentInstanceIds",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "Component instance IDs",
-                                            Items = new ToolOutputSchema { Type = "integer" }
-                                        }
-                                    },
-                                    {
-                                        "children",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "array",
-                                            Description = "Child GameObjects (recursive structure)",
-                                            Items = new ToolOutputSchema { Type = "object" }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads scene hierarchy only; no GameObjects or components are modified. Large scenes with thousands of objects may take several seconds to process."
-            };
         }
     }
 }

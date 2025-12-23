@@ -1,56 +1,55 @@
 using System.Collections.Generic;
 using System.Linq;
 using DatumStudios.EditorMCP.Registry;
-using DatumStudios.EditorMCP.Schemas;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: mcp.tools.list - Lists all available tools with their metadata.
     /// </summary>
-    public class McpToolsListTool : IEditorMcpTool
+    [McpToolCategory("mcp.platform")]
+    public static class McpToolsListTool
     {
-        private readonly ToolRegistry _toolRegistry;
-
         /// <summary>
-        /// Gets the tool definition.
+        /// Lists all available tools with their metadata, categories, and tier availability. Required for MCP client discovery.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the McpToolsListTool class.
-        /// </summary>
-        /// <param name="toolRegistry">The tool registry to query.</param>
-        public McpToolsListTool(ToolRegistry toolRegistry)
+        /// <param name="jsonParams">JSON parameters with optional "category" and "tier" filters.</param>
+        /// <returns>JSON string with list of tool summaries.</returns>
+        [McpTool("mcp.tools.list", "Lists all available tools with their metadata, categories, and tier availability. Required for MCP client discovery.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
-            _toolRegistry = toolRegistry;
-            Definition = CreateDefinition();
-        }
+            var toolRegistry = ToolRegistry.Current;
+            if (toolRegistry == null)
+            {
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                {
+                    { "tools", new object[0] },
+                    { "error", "ToolRegistry not initialized" }
+                });
+            }
 
-        /// <summary>
-        /// Invokes the tool to list all available tools.
-        /// </summary>
-        /// <param name="request">The tool invocation request with optional filters.</param>
-        /// <returns>List of tool summaries.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
-        {
+            // Parse JSON parameters
             string category = null;
             string tier = null;
 
-            if (request.Arguments != null)
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("category", out var categoryObj) && categoryObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    category = (string)categoryObj;
-                }
+                    if (paramsObj.TryGetValue("category", out var categoryObj) && categoryObj is string)
+                    {
+                        category = (string)categoryObj;
+                    }
 
-                if (request.Arguments.TryGetValue("tier", out var tierObj) && tierObj is string)
-                {
-                    tier = (string)tierObj;
+                    if (paramsObj.TryGetValue("tier", out var tierObj) && tierObj is string)
+                    {
+                        tier = (string)tierObj;
+                    }
                 }
             }
 
-            var tools = _toolRegistry.List(category, tier);
+            var tools = toolRegistry.List(category, tier);
             // Sort for deterministic ordering
             var sortedTools = tools.OrderBy(t => t.Id).ToList();
             var toolSummaries = sortedTools.Select(tool => new Dictionary<string, object>
@@ -63,118 +62,12 @@ namespace DatumStudios.EditorMCP.Tools
                 { "tier", tool.Tier ?? "" }
             }).ToArray();
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "tools", toolSummaries }
-                }
+                { "tools", toolSummaries }
             };
 
-            return response;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "mcp.tools.list",
-                Name = "List Tools",
-                Description = "Lists all available tools with their metadata, categories, and tier availability. Required for MCP client discovery.",
-                Category = "mcp.platform",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "category",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Optional category filter"
-                        }
-                    },
-                    {
-                        "tier",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Optional tier filter"
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "tools",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of tool summaries",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "id",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Tool identifier"
-                                        }
-                                    },
-                                    {
-                                        "name",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Human-readable tool name"
-                                        }
-                                    },
-                                    {
-                                        "category",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Tool category"
-                                        }
-                                    },
-                                    {
-                                        "safetyLevel",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Safety level (e.g., 'ReadOnly')"
-                                        }
-                                    },
-                                    {
-                                        "description",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Short description of the tool"
-                                        }
-                                    },
-                                    {
-                                        "tier",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Tier that provides access to this tool"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Returns tool metadata only; does not execute any tools."
-            };
+            return UnityEngine.JsonUtility.ToJson(result);
         }
     }
 }

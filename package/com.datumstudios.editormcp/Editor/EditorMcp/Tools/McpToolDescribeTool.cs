@@ -8,83 +8,78 @@ namespace DatumStudios.EditorMCP.Tools
     /// <summary>
     /// Tool: mcp.tool.describe - Returns the complete schema for a specific tool.
     /// </summary>
-    public class McpToolDescribeTool : IEditorMcpTool
+    [McpToolCategory("mcp.platform")]
+    public static class McpToolDescribeTool
     {
-        private readonly ToolRegistry _toolRegistry;
-
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns the complete schema for a specific tool, including input parameters, output structure, and safety information. Critical for LLM grounding and human inspection.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the McpToolDescribeTool class.
-        /// </summary>
-        /// <param name="toolRegistry">The tool registry to query.</param>
-        public McpToolDescribeTool(ToolRegistry toolRegistry)
+        /// <param name="jsonParams">JSON parameters with "toolId" string parameter.</param>
+        /// <returns>JSON string with complete tool definition.</returns>
+        [McpTool("mcp.tool.describe", "Returns the complete schema for a specific tool, including input parameters, output structure, and safety information. Critical for LLM grounding and human inspection.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
-            _toolRegistry = toolRegistry;
-            Definition = CreateDefinition();
-        }
+            var toolRegistry = ToolRegistry.Current;
+            if (toolRegistry == null)
+            {
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                {
+                    { "tool", new Dictionary<string, object> { { "error", "ToolRegistry not initialized" } } }
+                });
+            }
 
-        /// <summary>
-        /// Invokes the tool to describe a specific tool by ID.
-        /// </summary>
-        /// <param name="request">The tool invocation request with toolId parameter.</param>
-        /// <returns>Complete tool definition.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
-        {
+            // Parse JSON parameters
             string toolId = null;
 
-            if (request.Arguments != null && request.Arguments.TryGetValue("toolId", out var toolIdObj))
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                toolId = toolIdObj as string;
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null && paramsObj.TryGetValue("toolId", out var toolIdObj))
+                {
+                    toolId = toolIdObj as string;
+                }
             }
 
             if (string.IsNullOrEmpty(toolId))
             {
-                // This should not happen due to validation, but handle gracefully
-                toolId = "";
+                var emptyDefinition = new Dictionary<string, object>
+                {
+                    { "id", toolId ?? "" },
+                    { "error", "Tool not found" }
+                };
+
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                {
+                    { "tool", emptyDefinition }
+                });
             }
 
-            var definition = _toolRegistry.Describe(toolId);
+            var definition = toolRegistry.Describe(toolId);
 
             if (definition == null)
             {
-                // Return empty definition structure if tool not found
-                // The registry validation should catch this, but handle gracefully
                 var emptyDefinition = new Dictionary<string, object>
                 {
                     { "id", toolId },
                     { "error", "Tool not found" }
                 };
 
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "tool", emptyDefinition }
-                    }
-                };
+                    { "tool", emptyDefinition }
+                });
             }
 
             // Convert ToolDefinition to dictionary for JSON serialization
             var toolDict = ConvertDefinitionToDictionary(definition);
 
-            var response = new ToolInvokeResponse
+            return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "tool", toolDict }
-                }
-            };
-
-            return response;
+                { "tool", toolDict }
+            });
         }
 
-        private Dictionary<string, object> ConvertDefinitionToDictionary(ToolDefinition definition)
+        private static Dictionary<string, object> ConvertDefinitionToDictionary(ToolDefinition definition)
         {
             var dict = new Dictionary<string, object>
             {
@@ -129,7 +124,7 @@ namespace DatumStudios.EditorMCP.Tools
             return dict;
         }
 
-        private Dictionary<string, object> ConvertParameterSchemaToDictionary(ToolParameterSchema schema)
+        private static Dictionary<string, object> ConvertParameterSchemaToDictionary(ToolParameterSchema schema)
         {
             var dict = new Dictionary<string, object>
             {
@@ -177,7 +172,7 @@ namespace DatumStudios.EditorMCP.Tools
             return dict;
         }
 
-        private Dictionary<string, object> ConvertOutputSchemaToDictionary(ToolOutputSchema schema)
+        private static Dictionary<string, object> ConvertOutputSchemaToDictionary(ToolOutputSchema schema)
         {
             var dict = new Dictionary<string, object>
             {
@@ -202,127 +197,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
 
             return dict;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "mcp.tool.describe",
-                Name = "Describe Tool",
-                Description = "Returns the complete schema for a specific tool, including input parameters, output structure, and safety information. Critical for LLM grounding and human inspection.",
-                Category = "mcp.platform",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "toolId",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = true,
-                            Description = "The ID of the tool to describe"
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "tool",
-                        new ToolOutputSchema
-                        {
-                            Type = "object",
-                            Description = "Complete tool definition including schema, metadata, and safety information",
-                            Properties = new Dictionary<string, ToolOutputSchema>
-                            {
-                                {
-                                    "id",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Tool identifier"
-                                    }
-                                },
-                                {
-                                    "name",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Human-readable tool name"
-                                    }
-                                },
-                                {
-                                    "description",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Tool description"
-                                    }
-                                },
-                                {
-                                    "category",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Tool category"
-                                    }
-                                },
-                                {
-                                    "safetyLevel",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Safety level"
-                                    }
-                                },
-                                {
-                                    "tier",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Tier availability"
-                                    }
-                                },
-                                {
-                                    "schemaVersion",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Schema version"
-                                    }
-                                },
-                                {
-                                    "inputs",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "object",
-                                        Description = "Input parameter schemas"
-                                    }
-                                },
-                                {
-                                    "outputs",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "object",
-                                        Description = "Output property schemas"
-                                    }
-                                },
-                                {
-                                    "notes",
-                                    new ToolOutputSchema
-                                    {
-                                        Type = "string",
-                                        Description = "Additional notes"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Returns tool schema only; does not execute the tool."
-            };
         }
     }
 }

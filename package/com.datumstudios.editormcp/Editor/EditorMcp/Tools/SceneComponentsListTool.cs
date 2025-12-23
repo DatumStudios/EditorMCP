@@ -3,61 +3,51 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: scene.components.list - Returns all components attached to a specific GameObject.
     /// </summary>
-    public class SceneComponentsListTool : IEditorMcpTool
+    [McpToolCategory("scene")]
+    public static class SceneComponentsListTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns all components attached to a specific GameObject, including serialized field names. Enables safe inspection before any potential edits.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the SceneComponentsListTool class.
-        /// </summary>
-        public SceneComponentsListTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to list components on a GameObject.
-        /// </summary>
-        /// <param name="request">The tool invocation request with gameObjectPath and optional scenePath.</param>
-        /// <returns>Components list response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with "gameObjectPath" string (required) and optional "scenePath" string.</param>
+        /// <returns>JSON string with components list.</returns>
+        [McpTool("scene.components.list", "Returns all components attached to a specific GameObject, including serialized field names. Enables safe inspection before any potential edits.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             string scenePath = null;
             string gameObjectPath = null;
 
-            if (request.Arguments != null)
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (request.Arguments.TryGetValue("scenePath", out var scenePathObj) && scenePathObj is string)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null)
                 {
-                    scenePath = (string)scenePathObj;
-                }
+                    if (paramsObj.TryGetValue("scenePath", out var scenePathObj) && scenePathObj is string)
+                    {
+                        scenePath = (string)scenePathObj;
+                    }
 
-                if (request.Arguments.TryGetValue("gameObjectPath", out var gameObjectPathObj) && gameObjectPathObj is string)
-                {
-                    gameObjectPath = (string)gameObjectPathObj;
+                    if (paramsObj.TryGetValue("gameObjectPath", out var gameObjectPathObj) && gameObjectPathObj is string)
+                    {
+                        gameObjectPath = (string)gameObjectPathObj;
+                    }
                 }
             }
 
             if (string.IsNullOrEmpty(gameObjectPath))
             {
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", "gameObjectPath is required" }
-                    }
-                };
+                    { "error", "gameObjectPath is required" }
+                });
             }
 
             UnityEngine.SceneManagement.Scene scene;
@@ -131,14 +121,10 @@ namespace DatumStudios.EditorMCP.Tools
                     EditorSceneManager.CloseScene(scene, false);
                 }
 
-                return new ToolInvokeResponse
+                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
                 {
-                    Tool = Definition.Id,
-                    Output = new Dictionary<string, object>
-                    {
-                        { "error", $"GameObject with path '{gameObjectPath}' not found in scene" }
-                    }
-                };
+                    { "error", $"GameObject with path '{gameObjectPath}' not found in scene" }
+                });
             }
 
             // Clean up if we opened a scene
@@ -147,21 +133,17 @@ namespace DatumStudios.EditorMCP.Tools
                 EditorSceneManager.CloseScene(scene, false);
             }
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "gameObjectPath", gameObjectPath },
-                    { "scenePath", scenePath ?? "" },
-                    { "components", components.ToArray() }
-                }
+                { "gameObjectPath", gameObjectPath },
+                { "scenePath", scenePath ?? "" },
+                { "components", components.ToArray() }
             };
 
-            return response;
+            return UnityEngine.JsonUtility.ToJson(result);
         }
 
-        private GameObject FindGameObjectByPath(GameObject root, string path)
+        private static GameObject FindGameObjectByPath(GameObject root, string path)
         {
             if (root.name == path)
             {
@@ -206,92 +188,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
 
             return current.gameObject;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "scene.components.list",
-                Name = "List Scene Components",
-                Description = "Returns all components attached to a specific GameObject, including serialized field names. Enables safe inspection before any potential edits.",
-                Category = "scene",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "gameObjectPath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = true,
-                            Description = "Hierarchy path to the GameObject (e.g., 'Canvas/Panel/Button')"
-                        }
-                    },
-                    {
-                        "scenePath",
-                        new ToolParameterSchema
-                        {
-                            Type = "string",
-                            Required = false,
-                            Description = "Path to the scene file. If not provided, uses currently active scene."
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "gameObjectPath",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Hierarchy path to the GameObject"
-                        }
-                    },
-                    {
-                        "scenePath",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Path to the scene"
-                        }
-                    },
-                    {
-                        "components",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of components",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "type",
-                                        new ToolOutputSchema { Type = "string", Description = "Component type name" }
-                                    },
-                                    {
-                                        "instanceId",
-                                        new ToolOutputSchema { Type = "integer", Description = "Component instance ID" }
-                                    },
-                                    {
-                                        "index",
-                                        new ToolOutputSchema { Type = "integer", Description = "Component index" }
-                                    },
-                                    {
-                                        "fullTypeName",
-                                        new ToolOutputSchema { Type = "string", Description = "Full type name (namespace included)" }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads component data only; no components or properties are modified."
-            };
         }
     }
 }

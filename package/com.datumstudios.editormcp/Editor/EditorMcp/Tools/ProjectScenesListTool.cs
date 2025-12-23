@@ -3,42 +3,36 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: project.scenes.list - Lists all scenes in the project.
     /// </summary>
-    public class ProjectScenesListTool : IEditorMcpTool
+    [McpToolCategory("project")]
+    public static class ProjectScenesListTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Lists all scenes in the project with their paths and build settings status. Provides foundational context for scene-based operations.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the ProjectScenesListTool class.
-        /// </summary>
-        public ProjectScenesListTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to list scenes.
-        /// </summary>
-        /// <param name="request">The tool invocation request with optional includeAllScenes flag.</param>
-        /// <returns>List of scenes response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters with optional "includeAllScenes" boolean.</param>
+        /// <returns>JSON string with list of scenes.</returns>
+        [McpTool("project.scenes.list", "Lists all scenes in the project with their paths and build settings status. Provides foundational context for scene-based operations.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             bool includeAllScenes = false;
 
-            if (request.Arguments != null && request.Arguments.TryGetValue("includeAllScenes", out var includeAllObj))
+            // Parse JSON parameters
+            if (!string.IsNullOrEmpty(jsonParams) && jsonParams != "{}")
             {
-                if (includeAllObj is bool)
+                var paramsObj = UnityEngine.JsonUtility.FromJson<Dictionary<string, object>>(jsonParams);
+                if (paramsObj != null && paramsObj.TryGetValue("includeAllScenes", out var includeAllObj))
                 {
-                    includeAllScenes = (bool)includeAllObj;
+                    if (includeAllObj is bool)
+                    {
+                        includeAllScenes = (bool)includeAllObj;
+                    }
                 }
             }
 
@@ -91,94 +85,12 @@ namespace DatumStudios.EditorMCP.Tools
             // Sort by path for stable ordering
             scenes = scenes.OrderBy(s => s["path"] as string).ToList();
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "scenes", scenes.ToArray() }
-                }
+                { "scenes", scenes.ToArray() }
             };
 
-            return response;
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "project.scenes.list",
-                Name = "List Project Scenes",
-                Description = "Lists all scenes in the project with their paths and build settings status. Provides foundational context for scene-based operations.",
-                Category = "project",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>
-                {
-                    {
-                        "includeAllScenes",
-                        new ToolParameterSchema
-                        {
-                            Type = "boolean",
-                            Required = false,
-                            Description = "If true, includes all scenes in Assets folder, not just Build Settings. Default: false (Build Settings only).",
-                            Default = false
-                        }
-                    }
-                },
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "scenes",
-                        new ToolOutputSchema
-                        {
-                            Type = "array",
-                            Description = "List of scenes",
-                            Items = new ToolOutputSchema
-                            {
-                                Type = "object",
-                                Properties = new Dictionary<string, ToolOutputSchema>
-                                {
-                                    {
-                                        "path",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Scene file path (e.g., 'Assets/Scenes/Main.unity')"
-                                        }
-                                    },
-                                    {
-                                        "name",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "string",
-                                            Description = "Scene name (filename without extension)"
-                                        }
-                                    },
-                                    {
-                                        "enabledInBuild",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "boolean",
-                                            Description = "Whether scene is enabled in Build Settings"
-                                        }
-                                    },
-                                    {
-                                        "buildIndex",
-                                        new ToolOutputSchema
-                                        {
-                                            Type = "integer",
-                                            Description = "Build index (-1 if not in build settings)"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads scene list from EditorBuildSettings; no scene files are modified."
-            };
+            return UnityEngine.JsonUtility.ToJson(result);
         }
     }
 }

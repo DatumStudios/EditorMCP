@@ -2,34 +2,23 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
-using DatumStudios.EditorMCP.Schemas;
+using DatumStudios.EditorMCP.Registry;
 
 namespace DatumStudios.EditorMCP.Tools
 {
     /// <summary>
     /// Tool: project.info - Returns high-level project information.
     /// </summary>
-    public class ProjectInfoTool : IEditorMcpTool
+    [McpToolCategory("project")]
+    public static class ProjectInfoTool
     {
         /// <summary>
-        /// Gets the tool definition.
+        /// Returns high-level project information including Unity version, render pipeline, build targets, and project configuration.
         /// </summary>
-        public ToolDefinition Definition { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the ProjectInfoTool class.
-        /// </summary>
-        public ProjectInfoTool()
-        {
-            Definition = CreateDefinition();
-        }
-
-        /// <summary>
-        /// Invokes the tool to return project information.
-        /// </summary>
-        /// <param name="request">The tool invocation request (no arguments required).</param>
-        /// <returns>Project information response.</returns>
-        public ToolInvokeResponse Invoke(ToolInvokeRequest request)
+        /// <param name="jsonParams">JSON parameters (no parameters required).</param>
+        /// <returns>JSON string with project information.</returns>
+        [McpTool("project.info", "Returns high-level project information including Unity version, render pipeline, build targets, and project configuration. Provides foundational context for all other operations.", Tier.Core)]
+        public static string Invoke(string jsonParams)
         {
             var productName = PlayerSettings.productName;
             var unityVersion = Application.unityVersion;
@@ -37,23 +26,19 @@ namespace DatumStudios.EditorMCP.Tools
             var activeBuildTarget = EditorUserBuildSettings.activeBuildTarget.ToString();
             var renderPipeline = DetectRenderPipeline();
 
-            var response = new ToolInvokeResponse
+            var result = new Dictionary<string, object>
             {
-                Tool = Definition.Id,
-                Output = new Dictionary<string, object>
-                {
-                    { "productName", productName },
-                    { "unityVersion", unityVersion },
-                    { "platform", platform },
-                    { "activeBuildTarget", activeBuildTarget },
-                    { "renderPipeline", renderPipeline }
-                }
+                { "productName", productName },
+                { "unityVersion", unityVersion },
+                { "platform", platform },
+                { "activeBuildTarget", activeBuildTarget },
+                { "renderPipeline", renderPipeline }
             };
 
-            return response;
+            return UnityEngine.JsonUtility.ToJson(result);
         }
 
-        private string DetectRenderPipeline()
+        private static string DetectRenderPipeline()
         {
             var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
             if (renderPipelineAsset == null)
@@ -72,65 +57,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
 
             return "Unknown";
-        }
-
-        private ToolDefinition CreateDefinition()
-        {
-            return new ToolDefinition
-            {
-                Id = "project.info",
-                Name = "Project Info",
-                Description = "Returns high-level project information including Unity version, render pipeline, build targets, and project configuration. Provides foundational context for all other operations.",
-                Category = "project",
-                SafetyLevel = SafetyLevel.ReadOnly,
-                Tier = "core",
-                SchemaVersion = "0.1.0",
-                Inputs = new Dictionary<string, ToolParameterSchema>(),
-                Outputs = new Dictionary<string, ToolOutputSchema>
-                {
-                    {
-                        "productName",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Project product name"
-                        }
-                    },
-                    {
-                        "unityVersion",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Unity Editor version"
-                        }
-                    },
-                    {
-                        "platform",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Current platform"
-                        }
-                    },
-                    {
-                        "activeBuildTarget",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Active build target (e.g., StandaloneWindows64)"
-                        }
-                    },
-                    {
-                        "renderPipeline",
-                        new ToolOutputSchema
-                        {
-                            Type = "string",
-                            Description = "Render pipeline: URP, HDRP, Built-in, or Unknown"
-                        }
-                    }
-                },
-                Notes = "Read-only. Reads project settings only; no modifications are made."
-            };
         }
     }
 }
