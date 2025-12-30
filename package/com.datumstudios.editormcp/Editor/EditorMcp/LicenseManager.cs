@@ -35,6 +35,13 @@ namespace DatumStudios.EditorMCP
 #endif
             }
         }
+
+        /// <summary>
+        /// Gets whether the user has a valid Asset Store license for EditorMCP.
+        /// Includes developer override for local development.
+        /// </summary>
+        /// Includes developer override for local development.
+        /// </summary>
         }
 
         /// <summary>
