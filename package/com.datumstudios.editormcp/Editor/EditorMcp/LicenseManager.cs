@@ -37,15 +37,7 @@ namespace DatumStudios.EditorMCP
         }
 
         /// <summary>
-        /// Gets whether the user has a valid Asset Store license for EditorMCP.
-        /// Includes developer override for local development.
-        /// </summary>
-        /// Includes developer override for local development.
-        /// </summary>
-        }
-
-        /// <summary>
-        /// Gets whether the user has a valid Asset Store license for EditorMCP.
+        /// Gets whether user has a valid Asset Store license for EditorMCP.
         /// Includes developer override for local development.
         /// </summary>
         public static bool IsLicensed
@@ -82,10 +74,10 @@ namespace DatumStudios.EditorMCP
         }
 
         /// <summary>
-        /// Checks if the user has access to the specified tier.
+        /// Checks if user has access to specified tier.
         /// </summary>
         /// <param name="minTier">The minimum tier required.</param>
-        /// <returns>True if the user has access to the tier, false otherwise.</returns>
+        /// <returns>True if user has access to tier, false otherwise.</returns>
         public static bool HasTier(Tier minTier)
         {
             // Core tier is always available (free)
@@ -106,10 +98,10 @@ namespace DatumStudios.EditorMCP
         }
 
         /// <summary>
-        /// Gets the current tier available to the user.
+        /// Gets current tier available to user.
         /// Includes developer override for local development.
         /// </summary>
-        /// <returns>The highest tier the user has access to.</returns>
+        /// <returns>The highest tier user has access to.</returns>
         public static Tier CurrentTier
         {
             get
@@ -132,4 +124,3 @@ namespace DatumStudios.EditorMCP
         }
     }
 }
-
