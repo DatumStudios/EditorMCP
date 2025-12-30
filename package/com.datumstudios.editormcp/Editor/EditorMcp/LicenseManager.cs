@@ -79,7 +79,7 @@ namespace DatumStudios.EditorMCP
         /// Checks if user has access to specified tier.
         /// </summary>
         /// <param name="minTier">The minimum tier required.</param>
-        /// <returns>True if user has access to tier, false otherwise.</returns>
+        /// <returns>True if user has access to the tier, false otherwise.</returns>
         public static bool HasTier(Tier minTier)
         {
             // Core tier is always available (free)
@@ -100,10 +100,10 @@ namespace DatumStudios.EditorMCP
         }
 
         /// <summary>
-        /// Gets current tier available to user.
+        /// Gets the current tier available to the user.
         /// Includes developer override for local development.
         /// </summary>
-        /// <returns>The highest tier user has access to.</returns>
+        /// <returns>The highest tier the user has access to.</returns>
         public static Tier CurrentTier
         {
             get
