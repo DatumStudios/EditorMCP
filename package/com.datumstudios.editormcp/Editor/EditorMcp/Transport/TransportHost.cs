@@ -23,9 +23,22 @@ namespace DatumStudios.EditorMCP.Transport
         public bool IsRunning => _isRunning && !_disposed;
 
         /// <summary>
-        /// Gets the time when the transport was started, or null if not started.
+        /// Gets time when transport was started, or null if not started.
         /// </summary>
         public DateTime? StartedAt => _startedAt;
+
+        /// <summary>
+        /// Gets transport uptime in seconds, or null if not started.
+        /// </summary>
+        public double? UptimeSeconds
+        {
+            get
+            {
+                if (!_startedAt.HasValue)
+                    return null;
+                return (DateTime.UtcNow - _startedAt.Value).TotalSeconds;
+            }
+        }
 
         /// <summary>
         /// Initializes a new instance of the TransportHost class.
@@ -102,6 +115,28 @@ namespace DatumStudios.EditorMCP.Transport
                 _disposed = true;
             }
         }
+
+        /// <summary>
+        /// Gets transport health status including running state, uptime, and registry info.
+        /// </summary>
+        /// <returns>Dictionary containing health status information.</returns>
+        public System.Collections.Generic.Dictionary<string, object> GetHealthStatus()
+        {
+            var status = new System.Collections.Generic.Dictionary<string, object>
+            {
+                { "status", IsRunning ? "healthy" : "stopped" },
+                { "isRunning", IsRunning },
+                { "startedAt", _startedAt?.ToString("o") ?? null },
+                { "uptimeSeconds", UptimeSeconds ?? 0 },
+                { "toolCount", _toolRegistry?.Count ?? 0 }
+            };
+
+            if (_transport != null)
+            {
+                status.Add("transportType", "stdio");
+            }
+
+            return status;
+        }
     }
 }
-

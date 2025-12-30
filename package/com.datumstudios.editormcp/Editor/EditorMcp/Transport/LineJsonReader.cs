@@ -50,7 +50,7 @@ namespace DatumStudios.EditorMCP.Transport
 
             // Ignore empty lines
             if (string.IsNullOrWhiteSpace(line))
-                return ReadNextLine(); // Recursively read next line
+                return null;
 
             // Check line length
             int lineLengthBytes = Encoding.UTF8.GetByteCount(line);
@@ -59,6 +59,7 @@ namespace DatumStudios.EditorMCP.Transport
                 throw new InvalidOperationException($"Line exceeds maximum length of {_maxLineLength} bytes. Received {lineLengthBytes} bytes.");
             }
 
+            UnityEngine.Debug.Log($"ReadNextLine: line=[{line}], length={lineLengthBytes}, EndOfStream={_reader.EndOfStream}");
             return line;
         }
 

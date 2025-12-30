@@ -19,9 +19,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Detects missing script references and broken asset references in the project. High-value diagnostic tool with zero write risk.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with optional "scope" string ("all", "scenes", "prefabs", "assets").</param>
-        /// <returns>JSON string with missing references.</returns>
+        /// <returns>Dictionary with missing references.</returns>
         [McpTool("project.references.missing", "Detects missing script references and broken asset references in the project. High-value diagnostic tool with zero write risk.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             string scope = "all";
 
@@ -83,7 +83,7 @@ namespace DatumStudios.EditorMCP.Tools
                 output["diagnostics"] = diagnostics.ToArray();
             }
 
-            return UnityEngine.JsonUtility.ToJson(output);
+            return output;
         }
 
         private static void DetectMissingInScenes(List<Dictionary<string, object>> missingScripts, List<Dictionary<string, object>> brokenReferences, TimeGuard timeGuard, ref bool timeLimitExceeded)

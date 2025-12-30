@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns all components attached to a specific GameObject, including serialized field names. Enables safe inspection before any potential edits.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with "gameObjectPath" string (required) and optional "scenePath" string.</param>
-        /// <returns>JSON string with components list.</returns>
+        /// <returns>Dictionary with components list.</returns>
         [McpTool("scene.components.list", "Returns all components attached to a specific GameObject, including serialized field names. Enables safe inspection before any potential edits.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             string scenePath = null;
             string gameObjectPath = null;
@@ -42,12 +42,12 @@ namespace DatumStudios.EditorMCP.Tools
                 }
             }
 
-            if (string.IsNullOrEmpty(gameObjectPath))
+if (string.IsNullOrEmpty(gameObjectPath))
             {
-                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
-                {
-                    { "error", "gameObjectPath is required" }
-                });
+                return new Dictionary<string, object>
+                    {
+                        { "error", "gameObjectPath is required" }
+                    };
             }
 
             UnityEngine.SceneManagement.Scene scene;
@@ -121,10 +121,10 @@ namespace DatumStudios.EditorMCP.Tools
                     EditorSceneManager.CloseScene(scene, false);
                 }
 
-                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                return new Dictionary<string, object>
                 {
                     { "error", $"GameObject with path '{gameObjectPath}' not found in scene" }
-                });
+                };
             }
 
             // Clean up if we opened a scene
@@ -140,7 +140,7 @@ namespace DatumStudios.EditorMCP.Tools
                 { "components", components.ToArray() }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static GameObject FindGameObjectByPath(GameObject root, string path)

@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Finds GameObjects in a scene matching specified criteria (component type, name pattern, tag, layer). Composable and extremely useful for targeted inspection.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with optional "scenePath", "nameContains", "tag", "layer", "componentType".</param>
-        /// <returns>JSON string with matching GameObjects.</returns>
+        /// <returns>Dictionary with matching GameObjects.</returns>
         [McpTool("scene.objects.find", "Finds GameObjects in a scene matching specified criteria (component type, name pattern, tag, layer). Composable and extremely useful for targeted inspection.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             string scenePath = null;
             string nameContains = null;
@@ -120,7 +120,7 @@ namespace DatumStudios.EditorMCP.Tools
                 { "matches", matches.ToArray() }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static IEnumerable<GameObject> GetAllGameObjects(GameObject root)

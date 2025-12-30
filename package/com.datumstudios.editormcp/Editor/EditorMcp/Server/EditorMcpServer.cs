@@ -21,6 +21,20 @@ namespace DatumStudios.EditorMCP.Server
         private TransportHost _transportHost;
         private bool _isRunning;
         private string _serverVersion = "0.1.0";
+        private int _port;
+        private const string PORT_PREF_KEY = "EditorMcp.Port";
+        private const string WAS_RUNNING_PREF_KEY = "EditorMcp.WasRunning";
+        private const string AUTO_RESTART_PREF_KEY = "EditorMcp.AutoRestart";
+        private const string MAX_RETRIES_PREF_KEY = "EditorMcp.MaxRetries";
+        private const int DEFAULT_PORT = 27182;
+        private const int DEFAULT_MAX_RETRIES = 3;
+
+        private static EditorMcpServer _instance;
+
+        /// <summary>
+        /// Gets the singleton server instance.
+        /// </summary>
+        public static EditorMcpServer Instance => _instance;
 
         /// <summary>
         /// Gets the tool registry instance.
@@ -43,6 +57,11 @@ namespace DatumStudios.EditorMCP.Server
         public TransportHost TransportHost => _transportHost;
 
         /// <summary>
+        /// Gets the configured port for transport (for future WebSocket support).
+        /// </summary>
+        public int Port => _port;
+
+        /// <summary>
         /// Initializes a new instance of the EditorMcpServer class.
         /// </summary>
         public EditorMcpServer()
@@ -50,6 +69,68 @@ namespace DatumStudios.EditorMCP.Server
             _toolRegistry = new ToolRegistry();
             ToolRegistry.Current = _toolRegistry; // Set static accessor for static tools
             _isRunning = false;
+            _port = GetPortForCurrentProject();
+            _instance = this;
+        }
+
+        private int GetPortForCurrentProject()
+        {
+            // Try per-project port first
+            string projectNameHash = GetProjectNameHash();
+            string perProjectKey = $"{PORT_PREF_KEY}.{projectNameHash}";
+            int perProjectPort = EditorPrefs.GetInt(perProjectKey, -1);
+
+            if (perProjectPort >= 27182 && perProjectPort <= 65535)
+            {
+                return perProjectPort;
+            }
+
+            // Fallback to global port
+            return EditorPrefs.GetInt(PORT_PREF_KEY, DEFAULT_PORT);
+        }
+
+        private string GetProjectNameHash()
+        {
+            // Hash the product name for a consistent project-specific key
+            string productName = Application.productName ?? "UnityProject";
+            int hash = productName.GetHashCode();
+            return hash.ToString("X8"); // 8-character hex hash
+        }
+
+        [InitializeOnLoadMethod]
+        private static void InitializeOnLoad()
+        {
+            EditorApplication.delayCall += () =>
+            {
+                // Check if server should auto-restart after domain reload
+                bool wasRunning = EditorPrefs.GetBool(WAS_RUNNING_PREF_KEY, false);
+                bool autoRestart = EditorPrefs.GetBool(AUTO_RESTART_PREF_KEY, false);
+
+                if (wasRunning && autoRestart)
+                {
+                    Debug.Log("[EditorMCP] Server was running before domain reload. Auto-restarting...");
+                    EditorApplication.delayCall += () =>
+                    {
+                        try
+                        {
+                            var server = Instance;
+                            if (server != null && !server.IsRunning)
+                            {
+                                server.Start();
+                                Debug.Log("[EditorMCP] Server auto-restarted successfully");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError($"[EditorMCP] Failed to auto-restart server: {ex.Message}");
+                        }
+                    };
+                }
+                else if (wasRunning && !autoRestart)
+                {
+                    Debug.Log("[EditorMCP] Server was running before domain reload. Auto-restart is disabled. Manually restart the server to continue.");
+                }
+            };
         }
 
         /// <summary>
@@ -74,16 +155,14 @@ namespace DatumStudios.EditorMCP.Server
                 throw new InvalidOperationException(errorMessage);
             }
 
-            // Discover attribute-based tools (automatic discovery)
-            _toolRegistry.DiscoverAttributeTools();
-
-            // Note: Legacy CoreToolBootstrapper is no longer used - all tools are now attribute-based
+            // Tools are automatically discovered via [InitializeOnLoadMethod] in ToolRegistry
 
             // Create and start transport host
             _transportHost = new TransportHost(_toolRegistry, _serverVersion);
             _transportHost.Start();
 
             _isRunning = true;
+            EditorPrefs.SetBool(WAS_RUNNING_PREF_KEY, true);
         }
 
         /// <summary>
@@ -101,8 +180,8 @@ namespace DatumStudios.EditorMCP.Server
             _transportHost?.Dispose();
             _transportHost = null;
 
-            _toolRegistry.Clear();
             _isRunning = false;
+            EditorPrefs.SetBool(WAS_RUNNING_PREF_KEY, false);
         }
 
         /// <summary>
@@ -137,6 +216,61 @@ namespace DatumStudios.EditorMCP.Server
                 .ToArray();
 
             return categories;
+        }
+
+        /// <summary>
+        /// Configures the port for transport (for future WebSocket support).
+        /// </summary>
+        /// <param name="port">The port number (27182-65535).</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when port is out of valid range.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when server is running and port change requires restart.</exception>
+        public void ConfigurePort(int port, bool perProject = false)
+        {
+            if (port < 27182 || port > 65535)
+            {
+                throw new ArgumentOutOfRangeException(nameof(port), "Port must be between 27182 and 65535.");
+            }
+
+            if (_isRunning && port != _port)
+            {
+                // Port change requires restart - warn user
+                Debug.LogWarning($"EditorMCP: Port change from {_port} to {port} requires server restart. Use Restart() to apply changes.");
+            }
+
+            _port = port;
+
+            if (perProject)
+            {
+                // Save per-project port
+                string projectNameHash = GetProjectNameHash();
+                string perProjectKey = $"{PORT_PREF_KEY}.{projectNameHash}";
+                EditorPrefs.SetInt(perProjectKey, port);
+            }
+            else
+            {
+                // Save global port
+                EditorPrefs.SetInt(PORT_PREF_KEY, port);
+            }
+        }
+
+        /// <summary>
+        /// Restarts the server with current configuration (stops, then starts).
+        /// </summary>
+        public void Restart()
+        {
+            var wasRunning = _isRunning;
+            if (wasRunning)
+            {
+                Stop();
+            }
+
+            // Reload port from EditorPrefs in case it was changed externally
+            _port = EditorPrefs.GetInt(PORT_PREF_KEY, DEFAULT_PORT);
+
+            if (wasRunning)
+            {
+                Start();
+            }
         }
     }
 

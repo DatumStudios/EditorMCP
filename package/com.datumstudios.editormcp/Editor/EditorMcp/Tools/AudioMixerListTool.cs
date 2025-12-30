@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Lists all AudioMixer assets in the project with their groups and snapshots. Concrete, familiar example of domain-specific tooling without mutation.
         /// </summary>
         /// <param name="jsonParams">JSON parameters (no parameters required).</param>
-        /// <returns>JSON string with AudioMixer list.</returns>
+        /// <returns>Dictionary with AudioMixer list.</returns>
         [McpTool("audio.mixer.list", "Lists all AudioMixer assets in the project with their groups and snapshots. Concrete, familiar example of domain-specific tooling without mutation.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             var mixers = new List<Dictionary<string, object>>();
 
@@ -57,7 +57,7 @@ namespace DatumStudios.EditorMCP.Tools
                     { "mixers", new object[0] },
                     { "error", $"AudioMixer API not available: {ex.Message}" }
                 };
-                return UnityEngine.JsonUtility.ToJson(errorResult);
+                return errorResult;
             }
 
             var result = new Dictionary<string, object>
@@ -65,7 +65,7 @@ namespace DatumStudios.EditorMCP.Tools
                 { "mixers", mixers.ToArray() }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static Dictionary<string, object> SerializeMixer(AudioMixer mixer, string path, string guid)

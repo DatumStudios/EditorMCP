@@ -63,29 +63,27 @@ namespace DatumStudios.EditorMCP.Transport
         }
 
         /// <summary>
-        /// Gets or sets the result dictionary.
+        /// Gets or sets result dictionary.
         /// </summary>
         public Dictionary<string, object> Result
         {
             get
             {
-                if (string.IsNullOrEmpty(resultJson))
+                if (_result == null)
                     return new Dictionary<string, object>();
-                
-                // Parse resultJson - simplified for v0.1
-                // TODO: Use proper JSON parser in future versions
-                return new Dictionary<string, object>();
+                return _result;
             }
             set
             {
-                // Store as JSON string - simplified for v0.1
-                // TODO: Use proper JSON serialization in future versions
-                resultJson = JsonUtility.ToJson(value);
+                _result = value;
+                resultJson = value != null && value.Count > 0 ? McpJsonBuilder.BuildJson(value) : "{}";
             }
         }
 
+        private Dictionary<string, object> _result;
+
         /// <summary>
-        /// Gets or sets the error object.
+        /// Gets or sets error object.
         /// </summary>
         public McpError Error
         {

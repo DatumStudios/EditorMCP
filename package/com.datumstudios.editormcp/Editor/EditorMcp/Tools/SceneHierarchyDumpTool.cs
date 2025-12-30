@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns the complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with optional "scenePath" string and "includeInactive" boolean.</param>
-        /// <returns>JSON string with scene hierarchy.</returns>
-        [McpTool("scene.hierarchy.dump", "Returns the complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        /// <returns>Dictionary with scene hierarchy.</returns>
+        [McpTool("scene.hierarchy.dump", "Returns complete GameObject hierarchy for a scene, including components per node and object paths. Cornerstone tool for editor reasoning and structural analysis.", Tier.Core)]
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             string scenePath = null;
             bool includeInactive = false;
@@ -96,7 +96,7 @@ namespace DatumStudios.EditorMCP.Tools
                 { "rootObjects", rootObjects.ToArray() }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static Dictionary<string, object> SerializeGameObject(GameObject obj, bool includeInactive)

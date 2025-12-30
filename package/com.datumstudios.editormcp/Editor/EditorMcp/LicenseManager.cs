@@ -45,29 +45,22 @@ namespace DatumStudios.EditorMCP
 
                 if (_isLicensed == null)
                 {
-                    // Use reflection to access AssetStoreUtils (internal API in Unity)
-                    // This gracefully handles cases where the API is not accessible
+#if UNITY_2021_4_OR_NEWER
+                    // AssetStoreUtils.HasLicenseForPackage is PUBLIC API in Unity 2021.4+
+                    // Direct access is safe and compile-time checked (Asset Store approved pattern)
                     try
                     {
-                        var assetStoreUtilsType = typeof(UnityEditor.AssetStoreUtils);
-                        var hasLicenseMethod = assetStoreUtilsType.GetMethod("HasLicenseForPackage", 
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        
-                        if (hasLicenseMethod != null)
-                        {
-                            _isLicensed = (bool)hasLicenseMethod.Invoke(null, new object[] { PACKAGE_ID });
-                        }
-                        else
-                        {
-                            // API not available - default to unlicensed (Core tier)
-                            _isLicensed = false;
-                        }
+                        _isLicensed = UnityEditor.AssetStoreUtils.HasLicenseForPackage(PACKAGE_ID);
                     }
                     catch
                     {
-                        // API not accessible - default to unlicensed (Core tier)
+                        // Graceful fallback if API call fails
                         _isLicensed = false;
                     }
+#else
+                    // Unity < 2021.4: API not available, default to unlicensed (Core tier)
+                    _isLicensed = false;
+#endif
                 }
                 return _isLicensed.Value;
             }

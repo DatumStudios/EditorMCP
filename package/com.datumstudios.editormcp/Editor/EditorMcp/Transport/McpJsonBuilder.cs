@@ -48,11 +48,11 @@ namespace DatumStudios.EditorMCP.Transport
             sb.Append("{");
             sb.Append("\"jsonrpc\":\"2.0\"");
 
-            // ID
-            if (response.Id != null)
+            // ID - use original string to preserve type
+            if (!string.IsNullOrEmpty(response.id))
             {
                 sb.Append(",\"id\":");
-                sb.Append(JsonValue(response.Id));
+                sb.Append(JsonEscape(response.id));
             }
             else
             {
@@ -84,7 +84,7 @@ namespace DatumStudios.EditorMCP.Transport
             sb.Append("{");
             sb.Append($"\"code\":{error.Code}");
             sb.Append($",\"message\":{JsonEscape(error.Message)}");
-
+            
             if (error.Data != null && error.Data.Count > 0)
             {
                 sb.Append(",\"data\":");
@@ -94,7 +94,7 @@ namespace DatumStudios.EditorMCP.Transport
             {
                 sb.Append(",\"data\":{}");
             }
-
+            
             sb.Append("}");
             return sb.ToString();
         }

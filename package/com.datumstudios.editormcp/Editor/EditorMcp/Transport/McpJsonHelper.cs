@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
+[assembly:InternalsVisibleTo("DatumStudios.EditorMCP.Tests")]
+[assembly:InternalsVisibleTo("EditorMCP_TestHarness.Editor")]
+
 namespace DatumStudios.EditorMCP.Transport
+
 {
     /// <summary>
     /// Helper class for parsing MCP JSON envelopes. Provides simple JSON parsing

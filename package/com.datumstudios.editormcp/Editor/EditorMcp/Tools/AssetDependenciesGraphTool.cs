@@ -16,9 +16,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns the dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with "assetPath" or "guid" string, optional "depth" integer (1-10), and optional "direction" string ("dependencies", "dependents", "both").</param>
-        /// <returns>JSON string with dependency graph.</returns>
-        [McpTool("asset.dependencies.graph", "Returns the dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        /// <returns>Dictionary with dependency graph.</returns>
+        [McpTool("asset.dependencies.graph", "Returns dependency graph for an asset (what it depends on and what depends on it). Useful for understanding asset relationships and impact analysis.", Tier.Core)]
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             string assetPath = null;
             string guid = null;
@@ -63,10 +63,10 @@ namespace DatumStudios.EditorMCP.Tools
             // Validate input
             if (string.IsNullOrEmpty(assetPath) && string.IsNullOrEmpty(guid))
             {
-                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                return new Dictionary<string, object>
                 {
                     { "error", "Either 'assetPath' or 'guid' must be provided" }
-                });
+                };
             }
 
             // Validate depth
@@ -85,30 +85,30 @@ namespace DatumStudios.EditorMCP.Tools
                 assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath))
                 {
-                    return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                    return new Dictionary<string, object>
                     {
                         { "error", $"Asset with GUID '{guid}' not found" }
-                    });
+                    };
                 }
             }
 
             // Guard: Only process assets in Assets/ folder (never touch Packages/)
             if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/"))
             {
-                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                return new Dictionary<string, object>
                 {
                     { "error", $"Asset path must be in Assets/ folder. Package assets are not supported." }
-                });
+                };
             }
 
             // Validate path exists
             var pathGuid = AssetDatabase.AssetPathToGUID(assetPath);
             if (string.IsNullOrEmpty(pathGuid))
             {
-                return UnityEngine.JsonUtility.ToJson(new Dictionary<string, object>
+                return new Dictionary<string, object>
                 {
                     { "error", $"Asset at path '{assetPath}' not found" }
-                });
+                };
             }
 
             // Build dependency graph
@@ -132,7 +132,7 @@ namespace DatumStudios.EditorMCP.Tools
                 { "dependents", dependents.ToArray() }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static List<Dictionary<string, object>> BuildDependencyList(string assetPath, int maxDepth, bool recursive)

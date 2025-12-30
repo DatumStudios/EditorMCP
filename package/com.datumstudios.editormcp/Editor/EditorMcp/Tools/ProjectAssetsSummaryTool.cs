@@ -18,13 +18,12 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns a summary of project assets including counts by asset type, large assets, and unreferenced asset detection. Provides project health insights without mutation.
         /// </summary>
         /// <param name="jsonParams">JSON parameters (no parameters required).</param>
-        /// <returns>JSON string with asset summary.</returns>
+        /// <returns>Dictionary with asset summary.</returns>
         [McpTool("project.assets.summary", "Returns a summary of project assets including counts by asset type, large assets, and unreferenced asset detection. Provides project health insights without mutation.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             var timeGuard = new TimeGuard(TimeGuard.AssetScanMaxMilliseconds);
             var diagnostics = new List<string>();
-            bool timeLimitExceeded = false;
 
             var counts = new Dictionary<string, int>
             {
@@ -92,7 +91,6 @@ namespace DatumStudios.EditorMCP.Tools
             }
             catch (TimeoutException)
             {
-                timeLimitExceeded = true;
                 diagnostics.Add(timeGuard.GetPartialResultMessage(counts.Values.Sum()));
             }
 
@@ -107,10 +105,14 @@ namespace DatumStudios.EditorMCP.Tools
                 sortedByType[key] = counts[key];
             }
 
+            // Track if operation was truncated due to timeout (critical for batch safety)
+            bool truncated = diagnostics.Count > 0;
+
             var output = new Dictionary<string, object>
             {
                 { "totalAssets", totalAssets },
-                { "byType", sortedByType }
+                { "byType", sortedByType },
+                { "truncated", truncated }
             };
 
             if (diagnostics.Count > 0)
@@ -118,7 +120,7 @@ namespace DatumStudios.EditorMCP.Tools
                 output["diagnostics"] = diagnostics.ToArray();
             }
 
-            return UnityEngine.JsonUtility.ToJson(output);
+            return output;
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -23,7 +24,10 @@ namespace DatumStudios.EditorMCP.Transport
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            _writer = new StreamWriter(stream, Encoding.UTF8, 4096, true)
+            // Create StreamWriter without BOM (UTF8NoBOM) to avoid BOM issues in loopback tests
+            // Use UTF8 encoding without BOM for cleaner output
+            var utf8NoBom = new System.Text.UTF8Encoding(false); // false = no BOM
+            _writer = new StreamWriter(stream, utf8NoBom, 4096, true)
             {
                 AutoFlush = true // Flush immediately for real-time communication
             };
@@ -43,25 +47,45 @@ namespace DatumStudios.EditorMCP.Transport
             if (obj == null)
                 throw new ArgumentNullException(nameof(obj));
 
-            try
+            // Dictionary<string, object> needs manual serialization (JsonUtility returns empty {})
+            if (obj is Dictionary<string, object> dict)
             {
-                // Try JsonUtility first (works for simple objects)
-                string json = JsonUtility.ToJson(obj, prettyPrint: false);
-                _writer.WriteLine(json);
-                _writer.Flush(); // Ensure immediate write
+                var sb = new StringBuilder();
+                sb.Append("{");
+                bool first = true;
+                foreach (var kvp in dict)
+                {
+                    if (!first) sb.Append(",");
+                    first = false;
+                    sb.Append($"\"{kvp.Key}\":");
+                    var value = kvp.Value;
+                    if (value is string strValue)
+                        sb.Append($"\"{strValue}\"");
+                    else if (value is int || value is long || value is float || value is double || value is bool)
+                        sb.Append(value);
+                    else
+                        sb.Append($"\"{value}\"");
+                }
+                sb.Append("}");
+                var manualJson = sb.ToString();
+                _writer.Write(manualJson);
+                _writer.Write("\n");
+                _writer.Flush();
             }
-            catch
+            // Handle string directly
+            else if (obj is string jsonString)
             {
-                // If JsonUtility fails, try to write as string (for already-serialized JSON)
-                if (obj is string jsonString)
-                {
-                    _writer.WriteLine(jsonString);
-                    _writer.Flush();
-                }
-                else
-                {
-                    throw new ArgumentException($"Failed to serialize object of type {obj.GetType().Name}");
-                }
+                _writer.Write(jsonString);
+                _writer.Write("\n");
+                _writer.Flush();
+            }
+            // Try JsonUtility for other objects (works for simple types)
+            else
+            {
+                string json = JsonUtility.ToJson(obj, prettyPrint: false);
+                _writer.Write(json);
+                _writer.Write("\n");
+                _writer.Flush();
             }
         }
 
@@ -78,7 +102,8 @@ namespace DatumStudios.EditorMCP.Transport
             if (json == null)
                 throw new ArgumentNullException(nameof(json));
 
-            _writer.WriteLine(json);
+            _writer.Write(json);
+            _writer.Write("\n");
             _writer.Flush(); // Ensure immediate write
         }
 

@@ -16,9 +16,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns high-level project information including Unity version, render pipeline, build targets, and project configuration.
         /// </summary>
         /// <param name="jsonParams">JSON parameters (no parameters required).</param>
-        /// <returns>JSON string with project information.</returns>
+        /// <returns>Dictionary with project information.</returns>
         [McpTool("project.info", "Returns high-level project information including Unity version, render pipeline, build targets, and project configuration. Provides foundational context for all other operations.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             var productName = PlayerSettings.productName;
             var unityVersion = Application.unityVersion;
@@ -35,12 +35,12 @@ namespace DatumStudios.EditorMCP.Tools
                 { "renderPipeline", renderPipeline }
             };
 
-            return UnityEngine.JsonUtility.ToJson(result);
+            return result;
         }
 
         private static string DetectRenderPipeline()
         {
-            var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
+            var renderPipelineAsset = GraphicsSettings.defaultRenderPipeline;
             if (renderPipelineAsset == null)
             {
                 return "Built-in";

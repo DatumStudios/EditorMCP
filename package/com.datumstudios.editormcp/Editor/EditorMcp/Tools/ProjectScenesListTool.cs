@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Lists all scenes in the project with their paths and build settings status. Provides foundational context for scene-based operations.
         /// </summary>
         /// <param name="jsonParams">JSON parameters with optional "includeAllScenes" boolean.</param>
-        /// <returns>JSON string with list of scenes.</returns>
-        [McpTool("project.scenes.list", "Lists all scenes in the project with their paths and build settings status. Provides foundational context for scene-based operations.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        /// <returns>Dictionary with list of scenes.</returns>
+        [McpTool("project.scenes.list", "Lists all scenes in project with their paths and build settings status. Provides foundational context for scene-based operations.", Tier.Core)]
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             bool includeAllScenes = false;
 
@@ -85,12 +85,10 @@ namespace DatumStudios.EditorMCP.Tools
             // Sort by path for stable ordering
             scenes = scenes.OrderBy(s => s["path"] as string).ToList();
 
-            var result = new Dictionary<string, object>
+            return new Dictionary<string, object>
             {
-                { "scenes", scenes.ToArray() }
+                { "scenes", scenes }
             };
-
-            return UnityEngine.JsonUtility.ToJson(result);
         }
     }
 }

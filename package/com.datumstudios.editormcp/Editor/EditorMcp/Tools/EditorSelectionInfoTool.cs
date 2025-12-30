@@ -17,9 +17,9 @@ namespace DatumStudios.EditorMCP.Tools
         /// Returns information about currently selected objects and assets in the Unity Editor. Bridges human and AI workflows by providing current editor context.
         /// </summary>
         /// <param name="jsonParams">JSON parameters (no parameters required).</param>
-        /// <returns>JSON string with selection information.</returns>
-        [McpTool("editor.selection.info", "Returns information about currently selected objects and assets in the Unity Editor. Bridges human and AI workflows by providing current editor context.", Tier.Core)]
-        public static string Invoke(string jsonParams)
+        /// <returns>Dictionary with selection information.</returns>
+        [McpTool("editor.selection.info", "Returns information about currently selected objects and assets in Unity Editor. Bridges human and AI workflows by providing current editor context.", Tier.Core)]
+        public static Dictionary<string, object> Invoke(string jsonParams)
         {
             var selectedObjects = new List<Dictionary<string, object>>();
             var selectedGameObjects = Selection.gameObjects;
@@ -134,7 +134,7 @@ namespace DatumStudios.EditorMCP.Tools
                 output["activeGameObject"] = activeGameObject;
             }
 
-            return UnityEngine.JsonUtility.ToJson(output);
+            return output;
         }
 
         private static string GetHierarchyPath(GameObject obj)

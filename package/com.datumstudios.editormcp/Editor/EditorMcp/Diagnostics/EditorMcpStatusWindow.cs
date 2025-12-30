@@ -78,29 +78,120 @@ namespace DatumStudios.EditorMCP.Diagnostics
             EditorGUILayout.LabelField("Status:", statusText);
             GUI.color = originalColor2;
 
-            // Transport info
-            if (_server.IsRunning && _server.TransportHost != null)
+            // Transport Status & Configuration
+            EditorGUILayout.Space(5);
+            EditorGUILayout.LabelField("Transport Status", EditorStyles.boldLabel);
+            
+            // Transport type and status
+            var transportType = "Stdio"; // STDIO is primary, WebSocket is future
+            var transportStatus = _server.IsRunning && _server.TransportHost != null && _server.TransportHost.IsRunning
+                ? $"{transportType} ✓"
+                : $"{transportType} ✗";
+            
+            var transportColor = (_server.IsRunning && _server.TransportHost != null && _server.TransportHost.IsRunning) 
+                ? Color.green 
+                : Color.gray;
+            
+            var originalColor3 = GUI.color;
+            GUI.color = transportColor;
+            EditorGUILayout.LabelField("Transport:", transportStatus);
+            GUI.color = originalColor3;
+            
+            // Port Configuration (for future WebSocket support)
+            var currentPort = EditorPrefs.GetInt("EditorMcp.Port", 27182);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Port (WebSocket):", GUILayout.Width(150));
+            var newPort = EditorGUILayout.IntField(currentPort, GUILayout.Width(100));
+            EditorGUILayout.EndHorizontal();
+            
+            // Validate and apply port change
+            if (newPort != currentPort)
             {
-                var transport = _server.TransportHost;
-                EditorGUILayout.LabelField("Transport:", transport.IsRunning ? "Active" : "Inactive");
-                if (transport.StartedAt.HasValue)
+                if (newPort >= 27182 && newPort <= 65535)
                 {
-                    var uptime = DateTime.UtcNow - transport.StartedAt.Value;
-                    EditorGUILayout.LabelField("Uptime:", $"{uptime.TotalSeconds:F1}s");
+                    try
+                    {
+                        _server.ConfigurePort(newPort);
+                        if (_server.IsRunning)
+                        {
+                            EditorGUILayout.HelpBox("Port changed. Restart server to apply changes.", MessageType.Info);
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        EditorGUILayout.HelpBox($"Failed to configure port: {ex.Message}", MessageType.Error);
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("Port must be between 27182 and 65535.", MessageType.Warning);
                 }
             }
+            
+            // Uptime display
+            if (_server.IsRunning && _server.TransportHost != null && _server.TransportHost.StartedAt.HasValue)
+            {
+                var uptime = DateTime.UtcNow - _server.TransportHost.StartedAt.Value;
+                EditorGUILayout.LabelField("Uptime:", $"{uptime.TotalSeconds:F1}s");
+            }
+            
             EditorGUILayout.Space(5);
 
-            // Tool count
+            // Tool count and breakdown
             if (_server.IsRunning)
             {
-                EditorGUILayout.LabelField("Registered Tools:", _server.ToolRegistry.Count.ToString());
+                var toolCount = _server.ToolRegistry.Count;
+                EditorGUILayout.LabelField("Registered Tools:", toolCount.ToString());
+                
+                // Enhanced tool breakdown by category and tier
+                if (toolCount > 0)
+                {
+                    var tools = _server.ToolRegistry.List();
+                    
+                    // Tools by Category
+                    EditorGUILayout.Space(3);
+                    EditorGUILayout.LabelField("Tools by Category:", EditorStyles.miniLabel);
+                    var categories = tools.GroupBy(t => t.Category ?? "uncategorized")
+                                          .OrderBy(g => g.Key);
+                    foreach (var categoryGroup in categories)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.LabelField($"  {categoryGroup.Key}:", GUILayout.Width(150));
+                        EditorGUILayout.LabelField($"{categoryGroup.Count()} tools", EditorStyles.miniLabel);
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    
+                    // Tools by Tier
+                    EditorGUILayout.Space(3);
+                    EditorGUILayout.LabelField("Tools by Tier:", EditorStyles.miniLabel);
+                    var tiers = tools.GroupBy(t => t.Tier ?? "core")
+                                     .OrderBy(g => g.Key);
+                    foreach (var tierGroup in tiers)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.LabelField($"  {tierGroup.Key}:", GUILayout.Width(150));
+                        EditorGUILayout.LabelField($"{tierGroup.Count()} tools", EditorStyles.miniLabel);
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    
+                    // Discovery Method
+                    EditorGUILayout.Space(3);
+                    EditorGUILayout.LabelField("Discovery Method:", EditorStyles.miniLabel);
+                    var attributeCount = _server.ToolRegistry.AttributeToolCount;
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField("  Attribute-based:", GUILayout.Width(150));
+                    EditorGUILayout.LabelField($"{attributeCount} tools", EditorStyles.miniLabel);
+                    EditorGUILayout.EndHorizontal();
+                }
+                
                 EditorGUILayout.Space(5);
             }
 
             EditorGUILayout.Space(10);
 
-            // Start/Stop button
+            // Start/Stop/Restart buttons
+            EditorGUILayout.BeginHorizontal();
+            
             if (_server.IsRunning)
             {
                 if (GUILayout.Button("Stop Server", GUILayout.Height(30)))
@@ -113,6 +204,19 @@ namespace DatumStudios.EditorMCP.Diagnostics
                     catch (System.Exception ex)
                     {
                         Debug.LogError($"Failed to stop server: {ex.Message}");
+                    }
+                }
+                
+                if (GUILayout.Button("Restart Server", GUILayout.Height(30)))
+                {
+                    try
+                    {
+                        _server.Restart();
+                        Debug.Log($"EditorMCP server restarted. Registered {_server.ToolRegistry.Count} tools.");
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"Failed to restart server: {ex.Message}");
                     }
                 }
             }
@@ -131,6 +235,8 @@ namespace DatumStudios.EditorMCP.Diagnostics
                     }
                 }
             }
+            
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(10);
 

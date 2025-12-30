@@ -62,6 +62,8 @@ namespace DatumStudios.EditorMCP.Transport
                 {
                     case "tools/call":
                         return HandleToolsCall(request);
+                    case "tools/batchCall":
+                        return HandleToolsBatchCall(request);
                     case "tools/list":
                         return HandleToolsList(request);
                     case "tools/describe":
@@ -85,9 +87,130 @@ namespace DatumStudios.EditorMCP.Transport
             }
         }
 
-        private McpResponse HandleToolsCall(McpRequest request)
+        private McpResponse HandleToolsBatchCall(McpRequest request)
         {
             if (request.Params == null)
+            {
+                return CreateErrorResponse(request.Id, JsonRpcErrorCodes.InvalidParams,
+                    "Params is required for tools/batchCall", null);
+            }
+
+            if (!request.Params.TryGetValue("calls", out var callsObj) || !(callsObj is object[] callsArray))
+            {
+                return CreateErrorResponse(request.Id, JsonRpcErrorCodes.InvalidParams,
+                    "Params.calls (array) is required for tools/batchCall", null);
+            }
+
+            if (callsArray.Length == 0)
+            {
+                return CreateErrorResponse(request.Id, JsonRpcErrorCodes.InvalidParams,
+                    "Params.calls array must contain at least one call", null);
+            }
+
+            if (callsArray.Length > 10)
+            {
+                return CreateErrorResponse(request.Id, JsonRpcErrorCodes.InvalidParams,
+                    "Params.calls array cannot contain more than 10 calls", null);
+            }
+
+            var results = new List<Dictionary<string, object>>();
+            var errors = new List<Dictionary<string, object>>();
+
+            // Execute all calls in parallel (where possible)
+            foreach (object callObj in callsArray)
+            {
+                if (!(callObj is Dictionary<string, object> callParams))
+                {
+                    errors.Add(new Dictionary<string, object>
+                    {
+                        { "error", "Each call must be a dictionary/object" }
+                    });
+                    continue;
+                }
+
+                if (!callParams.TryGetValue("tool", out var toolObj) || !(toolObj is string toolId))
+                {
+                    errors.Add(new Dictionary<string, object>
+                    {
+                        { "error", "Each call must have a 'tool' string parameter" }
+                    });
+                    continue;
+                }
+
+                var arguments = callParams.TryGetValue("arguments", out var argsObj)
+                    ? ConvertToDictionary(argsObj)
+                    : new Dictionary<string, object>();
+
+                var invokeRequest = new ToolInvokeRequest
+                {
+                    Tool = toolId,
+                    Arguments = arguments
+                };
+
+                // Invoke tool via registry through main thread dispatcher
+                var dispatcherResponse = EditorMcpMainThreadDispatcher.Instance.Invoke(() =>
+                {
+                    var jsonParams = invokeRequest.Arguments.Count > 0 ? JsonUtility.ToJson(invokeRequest.Arguments) : "{}";
+                    var registryResult = _toolRegistry.Invoke(toolId, jsonParams);
+
+                    if (registryResult.IsSuccess)
+                    {
+                        return registryResult.Response;
+                    }
+                    else
+                    {
+                        // Convert error to ToolInvokeResponse format
+                        return new ToolInvokeResponse
+                        {
+                            Tool = toolId,
+                            Output = new Dictionary<string, object>
+                            {
+                                { "error", registryResult.Error.Message },
+                                { "code", registryResult.Error.Code },
+                                { "errorType", registryResult.Error.Data?.ErrorType ?? "execution" },
+                                { "details", registryResult.Error.Data?.Details ?? new Dictionary<string, object>() }
+                            },
+                            Diagnostics = new[] { $"Tool invocation failed: {registryResult.Error.Message}" }
+                        };
+                    }
+                }, TimeSpan.FromSeconds(30));
+
+                if (dispatcherResponse.Output.ContainsKey("error"))
+                {
+                    errors.Add(new Dictionary<string, object>
+                    {
+                        { "tool", toolId },
+                        { "error", dispatcherResponse.Output["error"] }
+                    });
+                }
+                else
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        { "tool", dispatcherResponse.Tool },
+                        { "output", dispatcherResponse.Output }
+                    });
+                }
+            }
+
+            return new McpResponse
+            {
+                JsonRpc = "2.0",
+                Id = request.Id,
+                Result = new Dictionary<string, object>
+                {
+                    { "results", results.ToArray() },
+                    { "errors", errors.ToArray() },
+                    { "totalCalls", callsArray.Length },
+                    { "successfulCalls", results.Count },
+                    { "failedCalls", errors.Count }
+                }
+            };
+        }
+
+        private McpResponse HandleToolsCall(McpRequest request)
+        {
+            if (request.Params == null || request.Params.Count == 0)
             {
                 return CreateErrorResponse(request.Id, JsonRpcErrorCodes.InvalidParams,
                     "Params is required for tools/call", null);
@@ -119,8 +242,18 @@ namespace DatumStudios.EditorMCP.Transport
             // The dispatcher expects Func<ToolInvokeResponse>, so we wrap ToolRegistry.Invoke
             var dispatcherResponse = EditorMcpMainThreadDispatcher.Instance.Invoke(() =>
             {
+                // Debug: Verify tool is registered before invoking
+                var isRegistered = _toolRegistry.IsRegistered(toolId);
+                var toolCount = _toolRegistry.Count;
+                if (!isRegistered)
+                {
+                    UnityEngine.Debug.LogWarning($"[McpMessageRouter] Tool '{toolId}' not found in registry. " +
+                        $"Registry has {toolCount} tools. Available tools: {string.Join(", ", _toolRegistry.List().Select(t => t.Id).Take(10))}...");
+                }
+
                 // This executes on the main thread - safe to call Unity APIs
-                var registryResult = _toolRegistry.Invoke(toolId, invokeRequest);
+                var jsonParams = invokeRequest.Arguments.Count > 0 ? JsonUtility.ToJson(invokeRequest.Arguments) : "{}";
+                var registryResult = _toolRegistry.Invoke(toolId, jsonParams);
                 
                 // Convert ToolInvocationResult to ToolInvokeResponse for dispatcher
                 if (registryResult.IsSuccess)
@@ -382,12 +515,13 @@ namespace DatumStudios.EditorMCP.Transport
             // Invoke tool via registry through main thread dispatcher
             // This ensures all Unity API calls execute on the main thread
             ToolInvocationResult result;
-            
-            // Wrap the registry invocation in a dispatcher call
+
+            // Wrap registry invocation in a dispatcher call
             var dispatcherResponse = EditorMcpMainThreadDispatcher.Instance.Invoke(() =>
             {
                 // This executes on the main thread - safe to call Unity APIs
-                var registryResult = _toolRegistry.Invoke(toolId, invokeRequest);
+                var jsonParams = invokeRequest.Arguments.Count > 0 ? JsonUtility.ToJson(invokeRequest.Arguments) : "{}";
+                var registryResult = _toolRegistry.Invoke(toolId, jsonParams);
                 
                 // Convert ToolInvocationResult to ToolInvokeResponse for dispatcher
                 if (registryResult.IsSuccess)
