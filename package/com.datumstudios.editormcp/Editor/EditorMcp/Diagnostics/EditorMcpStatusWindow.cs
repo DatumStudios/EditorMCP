@@ -141,6 +141,7 @@ namespace DatumStudios.EditorMCP.Diagnostics
             if (_server.IsRunning)
             {
                 var toolCount = _server.ToolRegistry.Count;
+                Debug.Log($"[EditorMCP] Status Window refresh: server instance {_server?.GetHashCode() ?? 0}, registry count {toolCount}");
                 EditorGUILayout.LabelField("Registered Tools:", toolCount.ToString());
                 
                 // Enhanced tool breakdown by category and tier

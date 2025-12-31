@@ -72,8 +72,14 @@ namespace DatumStudios.EditorMCP.Registry
         /// <summary>
         /// Discovers and registers all tools marked with [McpTool] attributes in current assembly.
         /// </summary>
-        public void DiscoverAttributeTools()
+        public void DiscoverAttributeTools(bool forceRediscovery = false)
         {
+            // Only clear and rediscover if forced or first discovery
+            if (!forceRediscovery && _attributeTools.Count > 0)
+            {
+                return;
+            }
+
             _attributeTools.Clear();
 
             var assembly = Assembly.GetExecutingAssembly();

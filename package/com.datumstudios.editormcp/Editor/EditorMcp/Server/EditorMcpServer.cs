@@ -155,11 +155,15 @@ namespace DatumStudios.EditorMCP.Server
                 throw new InvalidOperationException(errorMessage);
             }
 
-            // Tools are automatically discovered via [InitializeOnLoadMethod] in ToolRegistry
+            // Force tool discovery on every start to ensure tools are available
+            _toolRegistry.DiscoverAttributeTools(forceRediscovery: true);
 
             // Create and start transport host
             _transportHost = new TransportHost(_toolRegistry, _serverVersion);
             _transportHost.Start();
+
+            var registeredTools = _toolRegistry.List();
+            Debug.Log($"[EditorMCP] Server Start completed: server instance {GetHashCode()}, discovered {registeredTools.Count} tools");
 
             _isRunning = true;
             EditorPrefs.SetBool(WAS_RUNNING_PREF_KEY, true);
