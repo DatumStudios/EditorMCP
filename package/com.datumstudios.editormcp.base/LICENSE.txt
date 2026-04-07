@@ -1,0 +1,20 @@
+EditorMCP — Proprietary License
+
+Copyright (c) DatumStudios. All rights reserved.
+
+This software and its associated files (the "Software") are proprietary and confidential.
+
+Permission is granted to the purchaser or authorized user to use the Software solely within their own projects and workflows.
+
+You may NOT:
+- redistribute, sublicense, or resell the Software
+- distribute the Software as part of another asset, tool, or framework
+- copy or reuse substantial portions of the Software in another product
+- reverse engineer, decompile, or disassemble the Software for the purpose of redistribution or creating competing tools
+- remove or alter any proprietary notices
+
+This license does not grant ownership of the Software.
+
+All rights not expressly granted are reserved by DatumStudios.
+
+Third-party components are licensed separately under their respective licenses. See ThirdPartyLicenses.md.

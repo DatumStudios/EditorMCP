@@ -1,0 +1,29 @@
+{
+  "name": "com.datumstudios.editormcp.base",
+  "displayName": "EditorMCP Base",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "EditorMCP Base (free): Unity-hosted MCP automation tools for the Unity Editor. Includes Base tier payload only.",
+  "documentationUrl": "https://github.com/DatumStudios/EditorMCP/blob/main/docs/Index.md",
+  "changelogUrl": "https://github.com/DatumStudios/EditorMCP/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/DatumStudios/EditorMCP/blob/main/LICENSE.txt",
+  "keywords": [
+    "mcp",
+    "editor",
+    "automation",
+    "base",
+    "sku"
+  ],
+  "author": {
+    "name": "Datum Studios",
+    "url": "https://github.com/DatumStudios/EditorMCP"
+  },
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "license": "Proprietary",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DatumStudios/EditorMCP.git"
+  }
+}
