@@ -1,97 +1,60 @@
-# EditorMCP Base
+# EditorMCP
 
-EditorMCP Base is a Unity Editor tool that runs an MCP (Model Context Protocol) server inside Unity, allowing external AI tools to safely inspect and interact with your project.
+EditorMCP is a Unity Editor MCP (Model Context Protocol) server and tooling package that lets MCP-capable clients interact with your Unity project through a controlled editor surface.
+
+This repository distributes the **free Base tier** package only.
 
 ## What Base Includes
 
-- EditorMCP Base tier tool surface
+- Unity Editor MCP server integration
 - Editor UI under `Window -> EditorMCP`
-- STDIO and WebSocket transport support
-- Built-in self-test and diagnostics
+- Base-tier tool surface for foundational project interaction
+- Built-in health/self-test flow for setup validation
 
-## What Base Does Not Include
+## What Is Not In This Repo
 
-- Core / Pro / Studio tier functionality
-- No samples are shipped
-- `Runtime/` content (Editor-only package)
-- PDB debug symbol files
+- Core, Pro, and Studio tiers are not distributed from this repository
+- This repository is Base-only distribution
+- Runtime/build target support is not included (Editor-only package)
 
 ## Install (Unity Package Manager)
 
-Add via Git URL.
+Add this dependency to your Unity project's `Packages/manifest.json`:
 
-In Unity:
+```json
+{
+  "dependencies": {
+    "com.datumstudios.editormcp.base": "https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#v1.0.0"
+  }
+}
+```
 
-1. Open `Window -> Package Manager`
-2. Click `+ -> Add package from Git URL`
-3. Paste:
+You can also install from Unity Package Manager with **Add package from Git URL** using:
 
 `https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#v1.0.0`
 
-## Expected Result After Install
+## Quick Start
 
-- No console errors or warnings
-- Menu appears: `Window -> EditorMCP`
-- EditorMCP window opens
-- Server can be started
-
-## Open the UI
-
-In Unity, go to:
-
-`Window -> EditorMCP -> Status`
-
-Start the server (or enable auto-start).
-
-## Run Self-Test
-
-After the server is running, call `mcp.selfTest` from your MCP client.
-
-Expected result:
-
-- PASS
-- 0 warnings
-- 0 failures
-
-## Basic Usage Example
-
-Connect your MCP client to:
-
-- STDIO, or
-- `ws://127.0.0.1:27182/`
-
-Then call:
-
-1. `tools/list`
-2. `project.info`
-
-## Troubleshooting
-
-**Menu missing**
-
-- Check Unity Console for compile errors.
-
-**Server not responding**
-
-- Restart Unity.
-- Reopen the EditorMCP window.
-
-**Port conflict**
-
-- Default port: `27182`
-- Ensure the port is free.
-
-**Install issues**
-
-- Confirm dependency name: `com.datumstudios.editormcp.base`
-- Use Unity `2022.3` or newer.
+1. Install the package via the UPM Git URL above.
+2. In Unity, open `Window -> EditorMCP -> Status`.
+3. Start the EditorMCP server.
+4. From your MCP client, run `mcp.selfTest`.
 
 ## Platform Support
 
-- Windows (supported)
-- macOS (may work, not supported)
-- Runtime/build targets not supported (Editor-only)
+- Windows: supported
+- macOS: may work, not officially supported
+- Editor-only package: no Runtime/build support
 
-## Summary
+## Tier Overview
 
-EditorMCP Base provides a safe, structured bridge between Unity and AI tools, giving you a stable foundation for MCP-based workflows inside the Unity Editor.
+- **Base**: free tier (distributed in this repo)
+- **Core / Pro / Studio**: higher tiers available separately
+
+## License
+
+EditorMCP is proprietary software.
+
+Third-party attributions and notices are provided in:
+
+- `package/com.datumstudios.editormcp.base/ThirdPartyLicenses.md`
