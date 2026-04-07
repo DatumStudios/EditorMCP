@@ -12,7 +12,7 @@ EditorMCP Base is a Unity Editor tool that runs an MCP (Model Context Protocol) 
 ## What Base Does Not Include
 
 - Core / Pro / Studio tier functionality
-- `Samples~/` content
+- No samples are shipped
 - `Runtime/` content (Editor-only package)
 - PDB debug symbol files
 
