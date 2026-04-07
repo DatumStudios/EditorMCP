@@ -24,14 +24,14 @@ Add this dependency to your Unity project's `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.datumstudios.editormcp.base": "https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base"
+    "com.datumstudios.editormcp.base": "https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#v1.0.0"
   }
 }
 ```
 
 You can also install from Unity Package Manager with **Add package from Git URL** using:
 
-`https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base`
+`https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#v1.0.0`
 
 ## Quick Start
 

@@ -26,7 +26,7 @@ In Unity:
 2. Click `+ -> Add package from Git URL`
 3. Paste:
 
-`https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#main`
+`https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.editormcp.base#v1.0.0`
 
 ## Expected Result After Install
 
