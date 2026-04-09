@@ -101,7 +101,7 @@ Package-specific notes and troubleshooting: see **`package/com.datumstudios.edit
 
 EditorMCP has been submitted to the Unity Asset Store and is currently under review.
 
-The Base tier is open-source and included in this repository.  
+The Base tier is publicly available in this repository (proprietary license).  
 Core, Pro, and Studio are distributed as packaged Unity assets.
 
 Store links will be added here once the packages are approved and published.
