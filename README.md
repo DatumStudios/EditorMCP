@@ -27,7 +27,7 @@ Core, Pro, and Studio tiers are **not** published from this repo.
 
 - MCP server integration inside the Unity Editor
 - Editor UI under `Window -> EditorMCP`
-- A Base-tier tool surface for everyday editor and project tasks
+- A foundational MCP platform providing essential inspection, diagnostics, and transport capabilities
 - Health and self-test flows to validate setup
 
 <p align="center">
