@@ -6,6 +6,12 @@ If you use AI assistants or automation that speak MCP, EditorMCP connects them t
 
 EditorMCP is a Unity-hosted MCP automation platform that enables deterministic, structured interaction with your project through a curated tool surface.
 
+<p align="center">
+  <img src="docs/images/hero-overview.png" alt="EditorMCP overview" width="800"/>
+</p>
+
+<br>
+
 ---
 
 ## What this repository contains
@@ -23,6 +29,12 @@ Core, Pro, and Studio tiers are **not** published from this repo.
 - Editor UI under `Window -> EditorMCP`
 - A Base-tier tool surface for everyday editor and project tasks
 - Health and self-test flows to validate setup
+
+<p align="center">
+  <img src="docs/images/tool-window.png" alt="EditorMCP Base tools" width="800"/>
+</p>
+
+<br>
 
 ---
 
@@ -62,6 +74,12 @@ https://github.com/DatumStudios/EditorMCP.git?path=/package/com.datumstudios.edi
 2. Open **`Window -> EditorMCP -> Status`**.
 3. Start the EditorMCP server (or enable auto-start in settings if available).
 4. From your MCP client, call **`mcp.selfTest`** to confirm the connection.
+
+<p align="center">
+  <img src="docs/images/Connect-IDE.png" alt="Connect external IDEs and tools directly to Unity" width="800"/>
+</p>
+
+<br>
 
 ---
 
