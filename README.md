@@ -106,23 +106,31 @@ Package-specific notes and troubleshooting: see **`package/com.datumstudios.edit
 
 ## Tier Overview
 
-| Tier | Availability |
-|------|----------------|
-| **Base (Free)** | Included in this repository |
-| **Core** | Unity Asset Store (pending publication) |
-| **Pro** | Unity Asset Store (pending publication) |
-| **Studio** | Unity Asset Store (pending publication) |
+EditorMCP is delivered as a tiered system, scaling from a foundational MCP runtime to full automation workflows inside Unity.
+
+| Tier | Purpose | What it enables |
+|------|--------|----------------|
+| **Base (Free)** | Foundation | Editor-hosted MCP runtime, transport, diagnostics, and inspection tools |
+| **Core** | Visibility | Deeper project and scene inspection and structured read workflows |
+| **Pro** | Authoring | Controlled mutation and day-to-day editor automation |
+| **Studio** | Scale | Bounded batch operations, multi-scene workflows, and project-wide tools |
 
 ---
 
 ## 📦 Availability
 
-EditorMCP has been submitted to the Unity Asset Store and is currently under review.
-
-The Base tier is publicly available in this repository (proprietary license).  
-Core, Pro, and Studio are distributed as packaged Unity assets.
+- **Base (Free):** Included in this repository (proprietary license)  
+- **Core / Pro / Studio:** Distributed via Unity Asset Store (pending publication)  
 
 Store links will be added here once the packages are approved and published.
+
+## Why Base matters
+
+Base provides the core EditorMCP runtime inside Unity, including transport, health and self-test flows, tool discovery, and a practical inspection surface.
+
+With Base, users can inspect project context, search project text under `Assets/`, dump scene hierarchy and component structure, and validate connectivity and runtime health.
+
+That makes Base useful on its own for diagnostics, inspection, and custom integrations, while also serving as the foundation for the larger Core, Pro, and Studio tiers.
 
 ---
 
